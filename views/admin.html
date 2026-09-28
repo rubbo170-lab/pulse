@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Admin · Pulso</title>
+<meta name="robots" content="noindex">
+<meta name="theme-color" content="#121016">
+<link rel="icon" href="/img/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/css/site.css">
+<link rel="stylesheet" href="/css/pages.css">
+</head>
+<body>
+<header class="site-head"><div class="wrap">
+  <a class="logo" href="/" aria-label="Pulso, página inicial"><svg viewBox="0 0 34 34" aria-hidden="true"><rect x="1" y="1" width="32" height="32" rx="10" fill="#7C5CFF"/><path d="M5 18h6l2.5-7 4 13 3-9 1.6 3H29" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg><span>pulso</span></a>
+  <nav class="nav" aria-label="Principal">
+    <span class="chip">Admin</span>
+    <a class="lnk" href="/meus-videos">Meus vídeos</a>
+    <button class="btn small ghost" type="button" data-logout>Sair</button>
+  </nav>
+</div></header>
+
+<main class="wrap admin" id="admin" hidden>
+  <div class="list-head" style="margin:0"><div><p class="eyebrow">Painel</p><h1 class="h-display" style="font-size:36px">Vendas e pedidos</h1></div><div class="bar-row"><button class="btn small" id="refreshBtn" type="button">Atualizar</button><a class="btn small" href="/api/admin/backup">Baixar backup do banco</a></div></div>
+  <div class="kpis" id="kpis"></div>
+  <div class="cfg" id="cfg"></div>
+  <div class="alerts" id="alerts"></div>
+
+  <div class="bar-row">
+    <div class="pill-tabs" role="tablist"><button type="button" role="tab" data-tab="orders" aria-selected="true">Pedidos</button><button type="button" role="tab" data-tab="users" aria-selected="false">Clientes</button></div>
+  </div>
+
+  <section id="tabOrders" class="stack">
+    <div class="bar-row">
+      <select id="fStatus" style="max-width:220px"><option value="">Todos os status</option><option value="awaiting_payment">Aguardando pagamento</option><option value="paid">Na fila</option><option value="rendering">Gerando</option><option value="ready">Pronto</option><option value="failed">Falhou</option><option value="refunded">Reembolsado</option><option value="expired">Expirado</option></select>
+      <input type="search" id="fQ" placeholder="Buscar por e-mail, empresa, pedido ou pagamento" style="max-width:380px">
+    </div>
+    <div class="tbl-wrap"><table class="tbl"><thead><tr><th>Data</th><th>Pedido</th><th>Cliente</th><th>Empresa</th><th>Status</th><th class="num">Valor</th><th>Pagamento</th><th>Render</th></tr></thead><tbody id="oRows"></tbody></table></div>
+    <div class="bar-row"><button class="btn small" id="prevPg" type="button">Anteriores</button><button class="btn small" id="nextPg" type="button">Próximos</button><span class="dim" id="pgInfo"></span></div>
+  </section>
+
+  <section id="tabUsers" class="stack" hidden>
+    <input type="search" id="uQ" placeholder="Buscar por nome ou e-mail" style="max-width:380px">
+    <div class="tbl-wrap"><table class="tbl"><thead><tr><th>Criada em</th><th>Nome</th><th>E-mail</th><th>WhatsApp</th><th>Idioma</th><th class="num">Pagos</th><th></th></tr></thead><tbody id="uRows"></tbody></table></div>
+  </section>
+</main>
+<main class="wrap auth-page" id="claim" hidden><div class="card">
+  <h1>Confirme o acesso de administrador</h1>
+  <p class="muted">Primeiro acesso deste e-mail ao painel. Digite o código definido na variável <b>ADMIN_TOKEN</b> do servidor. Isso é pedido uma única vez.</p>
+  <form class="stack" id="claimForm" novalidate>
+    <label class="fld"><span>Código de administrador</span><input type="password" id="claimToken" autocomplete="off" maxlength="200" required></label>
+    <p class="msg" id="claimMsg" aria-live="polite"></p>
+    <button class="btn primary big block" type="submit">Confirmar</button>
+  </form>
+</div></main>
+<main class="wrap auth-page" id="denied" hidden><div class="card center"><h1>Página não encontrada</h1><p class="muted">Entre com uma conta de administrador.</p><p><a class="btn primary" href="/entrar?volta=/admin">Entrar</a></p></div></main>
+
+<aside class="drawer" id="drawer" hidden aria-label="Detalhes do pedido"></aside>
+<script src="/i18n/pt.js"></script>
+<script src="/js/common.js"></script>
+<script src="/js/admin.js"></script>
+</body>
+</html>

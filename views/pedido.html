@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Seu pedido · Pulso</title>
+<meta name="robots" content="noindex">
+<meta name="theme-color" content="#121016">
+<!--HREFLANG-->
+<link rel="icon" href="/img/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/css/site.css">
+<link rel="stylesheet" href="/css/pages.css">
+</head>
+<body>
+<header class="site-head"><div class="wrap">
+  <a class="logo" href="/" aria-label="Pulso, página inicial"><svg viewBox="0 0 34 34" aria-hidden="true"><rect x="1" y="1" width="32" height="32" rx="10" fill="#7C5CFF"/><path d="M5 18h6l2.5-7 4 13 3-9 1.6 3H29" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg><span>pulso</span></a>
+  <nav class="nav" aria-label="Principal">
+    <a class="lnk" href="/meus-videos" data-auth="in" hidden>Meus vídeos</a>
+    <button class="btn small ghost" type="button" data-auth="in" data-logout hidden>Sair</button>
+    <a class="btn small primary" href="/criar">Criar vídeo</a>
+  </nav>
+</div></header>
+
+<main class="wrap order-page">
+  <div class="order-grid">
+    <section class="order-info">
+      <p class="eyebrow" id="oBrand">Seu pedido</p>
+      <h1 class="h-display" id="oTitle">Carregando…</h1>
+      <p class="lead" id="oText"></p>
+      <ol class="track" id="track" aria-label="Andamento do pedido">
+        <li data-step="pay"><span></span>Pagamento</li>
+        <li data-step="queue"><span></span>Na fila</li>
+        <li data-step="render"><span></span>Gerando</li>
+        <li data-step="ready"><span></span>Pronto</li>
+      </ol>
+      <div class="progress big" id="prog" hidden><i id="bar"></i></div>
+      <p class="msg" id="oMsg" aria-live="polite"></p>
+      <div class="actions" id="oActions"></div>
+      <dl class="facts-list" id="oFacts"></dl>
+    </section>
+    <section class="order-visual">
+      <div class="phone" id="oPhone">
+        <video id="oVideo" controls playsinline preload="metadata" hidden></video>
+        <img id="oPoster" alt="" hidden>
+        <div class="waiting" id="oWaiting"><div class="spinner"></div><span id="oWaitText">Aguardando</span></div>
+      </div>
+    </section>
+  </div>
+</main>
+
+<footer class="site-foot"><div class="wrap">
+  <div><a class="logo" href="/" aria-label="Pulso"><svg viewBox="0 0 34 34" aria-hidden="true"><rect x="1" y="1" width="32" height="32" rx="10" fill="#7C5CFF"/><path d="M5 18h6l2.5-7 4 13 3-9 1.6 3H29" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg><span>pulso</span></a><p data-co="line"></p></div>
+  <nav aria-label="Rodapé"><a href="/criar">Criar vídeo</a><a href="/meus-videos">Meus vídeos</a><a href="/termos">Termos de Uso</a><a href="/privacidade">Privacidade</a><a data-co="support" href="#" hidden>Suporte</a></nav>
+  <nav class="langs" aria-label="Idioma"><!--LANGS--></nav>
+</div></footer>
+<script src="/i18n/pt.js"></script>
+<script src="/js/common.js"></script>
+<script src="/js/pedido.js"></script>
+</body>
+</html>

@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Nova senha · Pulso</title>
+<meta name="robots" content="noindex">
+<meta name="referrer" content="no-referrer">
+<meta name="theme-color" content="#121016">
+<!--HREFLANG-->
+<link rel="icon" href="/img/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/css/site.css">
+<link rel="stylesheet" href="/css/pages.css">
+</head>
+<body>
+<header class="site-head"><div class="wrap">
+  <a class="logo" href="/" aria-label="Pulso, página inicial"><svg viewBox="0 0 34 34" aria-hidden="true"><rect x="1" y="1" width="32" height="32" rx="10" fill="#7C5CFF"/><path d="M5 18h6l2.5-7 4 13 3-9 1.6 3H29" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg><span>pulso</span></a>
+</div></header>
+
+<main class="wrap auth-page">
+  <div class="card">
+    <h1>Criar nova senha</h1>
+    <p class="muted" style="margin:0 0 16px">Escolha uma senha com pelo menos 8 caracteres.</p>
+    <form class="stack" id="resetForm" novalidate>
+      <label class="fld"><span>Nova senha</span><input type="password" name="p1" autocomplete="new-password" minlength="8" maxlength="200" required></label>
+      <label class="fld"><span>Repita a senha</span><input type="password" name="p2" autocomplete="new-password" minlength="8" maxlength="200" required></label>
+      <p class="msg" id="resetMsg" aria-live="polite"></p>
+      <button class="btn primary big block" type="submit">Salvar e entrar</button>
+    </form>
+  </div>
+</main>
+
+<footer class="site-foot"><div class="wrap">
+  <div><p data-co="line"></p></div>
+  <nav aria-label="Rodapé"><a href="/termos">Termos de Uso</a><a href="/privacidade">Privacidade</a><a data-co="support" href="#" hidden>Suporte</a></nav>
+  <nav class="langs" aria-label="Idioma"><!--LANGS--></nav>
+</div></footer>
+<script src="/i18n/pt.js"></script>
+<script src="/js/common.js"></script>
+<script src="/js/nova-senha.js"></script>
+</body>
+</html>

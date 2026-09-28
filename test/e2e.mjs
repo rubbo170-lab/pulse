@@ -1,0 +1,392 @@
+// Teste de ponta a ponta: navegador de verdade + Mercado Pago, Stripe e Anthropic falsos + render real.
+// Uso: node --disable-warning=ExperimentalWarning test/e2e.mjs   (precisa do Playwright global e de ffmpeg)
+import { spawn, execFileSync } from 'node:child_process';
+import { createRequire } from 'node:module';
+import crypto from 'node:crypto';
+import fs from 'node:fs';
+import path from 'node:path';
+import { startMocks } from './mocks.mjs';
+
+const require = createRequire(import.meta.url);
+const { chromium } = require('playwright');
+const ROOT = path.resolve(path.dirname(new URL(import.meta.url).pathname), '..');
+const PORT = 3931, BASE = `http://127.0.0.1:${PORT}`, DATA = '/tmp/pulso-e2e', SHOTS = path.join(DATA, 'shots');
+const ADMIN = 'admin@pulso.test', ADMIN_TOKEN = 'codigo-do-dono-e2e';
+fs.rmSync(DATA, { recursive: true, force: true }); fs.mkdirSync(SHOTS, { recursive: true });
+
+const results = [];
+const check = (name, ok, extra = '') => { results.push({ name, ok: !!ok, extra }); console.log(`${ok ? 'OK  ' : 'FALHOU'} ${name}${extra ? ' — ' + extra : ''}`); };
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const nb = (x) => String(x || '').replace(/\u00a0/g, ' '); // o Intl separa "R$" do número com espaço fixo
+
+const mocks = await startMocks();
+mocks.setStripeWebhook(`${BASE}/api/webhooks/stripe`);
+const env = { ...process.env, PORT: String(PORT), APP_URL: BASE, DATA_DIR: DATA, ADMIN_EMAILS: ADMIN, ADMIN_TOKEN, RENDER_FPS: process.env.FPS || '30',
+  MP_ACCESS_TOKEN: 'APP_USR-teste', MP_API_BASE: mocks.url, MP_WEBHOOK_SECRET: mocks.webhookSecret, ANTHROPIC_API_KEY: 'sk-ant-teste', ANTHROPIC_BASE_URL: mocks.url,
+  STRIPE_SECRET_KEY: 'sk_test_e2e', STRIPE_WEBHOOK_SECRET: mocks.stripeWebhookSecret, STRIPE_API_BASE: mocks.url,
+  COMPANY_NAME: 'MGR Serviços Digitais', COMPANY_DOC: '00.000.000/0001-00', SUPPORT_EMAIL: 'suporte@exemplo.com', SUPPORT_WHATSAPP: '5511900000000' };
+const srv = spawn(process.execPath, ['--disable-warning=ExperimentalWarning', 'server.js'], { cwd: ROOT, env, stdio: ['ignore', 'pipe', 'pipe'] });
+const srvLog = [];
+srv.stdout.on('data', (d) => srvLog.push(String(d))); srv.stderr.on('data', (d) => srvLog.push(String(d)));
+for (let i = 0; i < 80; i++) { try { if ((await fetch(BASE + '/api/health')).ok) break; } catch { /* subindo */ } await sleep(100); }
+
+// cliente HTTP com cookie próprio (para testes de API)
+function client() {
+  let cookie = '';
+  const c = async (method, p, body, headers = {}) => {
+    const r = await fetch(BASE + p, { method, redirect: 'manual', headers: { ...(body !== undefined ? { 'content-type': 'application/json' } : {}), cookie, ...headers }, body: body === undefined ? undefined : typeof body === 'string' ? body : JSON.stringify(body) });
+    const sc = r.headers.get('set-cookie'); if (sc) cookie = sc.split(';')[0];
+    const text = await r.text(); let json = null; try { json = JSON.parse(text); } catch { /* não é json */ }
+    return { status: r.status, headers: r.headers, json, text, setCookie: sc };
+  };
+  c.cookie = () => cookie;
+  return c;
+}
+const probe = (file) => {
+  const pr = JSON.parse(execFileSync('ffprobe', ['-v', 'error', '-show_entries', 'stream=codec_name,width,height,r_frame_rate,pix_fmt,sample_rate,channels:format=duration,size', '-of', 'json', file]));
+  return { v: pr.streams.find((s) => s.codec_name === 'h264'), a: pr.streams.find((s) => s.codec_name === 'aac'), dur: Number(pr.format.duration), size: Number(pr.format.size) };
+};
+
+const browser = await chromium.launch({ executablePath: process.env.PW_CHROME || '/opt/pw-browsers/chromium', args: ['--disable-gpu'] });
+const pageErrors = [];
+const watch = (page, tag) => { page.on('pageerror', (e) => pageErrors.push(`${tag}: ${e.message}`)); page.on('console', (m) => { if (m.type() === 'error' && !/favicon|404|401|403|429|409/.test(m.text())) pageErrors.push(`${tag} console: ${m.text()}`); }); };
+let orderId = null, enOrder = null;
+
+try {
+  // ── 1. página inicial
+  const ctx = await browser.newContext({ viewport: { width: 1280, height: 860 }, acceptDownloads: true, locale: 'pt-BR' });
+  const page = await ctx.newPage(); watch(page, 'cliente');
+  await page.goto(BASE + '/');
+  await page.waitForTimeout(800);
+  const priceCard = nb(await page.textContent('.price-card'));
+  check('página inicial carrega com os preços de 15 e 20 s', priceCard.includes('R$ 29,90') && priceCard.includes('R$ 34,90'), priceCard.replace(/\s+/g, ' ').slice(0, 90));
+  await page.screenshot({ path: path.join(SHOTS, '01-inicio.png'), fullPage: true });
+
+  // ── 2. editor: dados reais, exemplo apagado, roteiro com IA, logo
+  await page.click('.hero-cta a.btn.primary');
+  await page.waitForURL('**/criar');
+  await page.waitForFunction(() => window.PulsoEditor && PulsoEditor.state.engine, null, { timeout: 30000 });
+  await page.fill('#f_name', 'Café Ponto Doce');
+  check('dados fictícios do exemplo são apagados ao trocar o nome', (await page.inputValue('#f_insta')) === '' && (await page.inputValue('#f_rating')) === '' && (await page.inputValue('#f_whats')) === '');
+  await page.selectOption('#f_segment', 'Cafeteria');
+  await page.fill('#f_sells', 'Cafés especiais, pão de queijo e bolos caseiros para o café da manhã');
+  await page.fill('#f_diffs', 'Grãos torrados na semana\nPão de queijo quentinho\nPedido pelo WhatsApp');
+  await page.fill('#f_whats', '(11) 90000-1234');
+  await page.click('#aiBtn');
+  await page.waitForFunction(() => document.getElementById('f_hook1').value === 'CAFÉ', null, { timeout: 15000 });
+  check('roteiro com IA (servidor) preenche os campos', (await page.inputValue('#f_product')) === 'Cappuccino da casa');
+  const c1Before = await page.inputValue('#f_c1');
+  await page.setInputFiles('#f_logo', path.join(ROOT, 'test/examples/burger-logo.png'));
+  await page.waitForTimeout(1200);
+  const c1After = await page.inputValue('#f_c1');
+  check('cores da marca tiradas do logo automaticamente', c1After !== c1Before && /cores do seu logo/.test(await page.textContent('#status')), `${c1Before} → ${c1After}`);
+  await page.screenshot({ path: path.join(SHOTS, '02-editor.png'), fullPage: false });
+  const wm = await page.evaluate(() => { const c = document.getElementById('pv'); const x = c.getContext('2d'); const d = x.getImageData(0, 0, c.width, Math.round(c.height * 0.06)).data; let bright = 0; for (let i = 0; i < d.length; i += 4) if (d[i] > 200 && d[i + 1] > 200 && d[i + 2] > 200) bright++; return bright; });
+  check('prévia mostra a marca PRÉVIA', wm > 50, `${wm} px claros no topo`);
+
+  // ── 3. compra: cadastro na janela, checkout, Pix aprovado, volta ao pedido
+  await page.click('#buyBtn');
+  await page.waitForSelector('.modal form');
+  await page.fill('.modal input[name=name]', 'Maria Cliente');
+  await page.fill('.modal input[name=email]', 'maria@cliente.test');
+  await page.fill('.modal input[name=password]', 'senha-da-maria-1');
+  await page.check('.modal input[name=accept]');
+  await page.screenshot({ path: path.join(SHOTS, '03-cadastro.png') });
+  await page.click('.modal button[type=submit]');
+  await page.waitForURL(/\/mp\/checkout\//, { timeout: 30000 });
+  check('vai para o checkout do Mercado Pago', true, new URL(page.url()).pathname);
+  const pref = [...mocks.prefs.values()].pop();
+  orderId = pref.external_reference;
+  check('preferência com valor e referência certos', pref.items[0].unit_price === 29.9 && pref.items[0].currency_id === 'BRL' && /^[a-z0-9]{16}$/.test(orderId), `${pref.items[0].title}`);
+  check('Pix e cartão, sem boleto', JSON.stringify(pref.payment_methods.excluded_payment_types) === JSON.stringify([{ id: 'ticket' }, { id: 'atm' }]));
+  await page.click('#approve');
+  await page.waitForURL(/\/pedido\/[a-z0-9]{16}/, { timeout: 30000 });
+  await page.waitForFunction(() => /Pagamento confirmado|Gerando|pronto/.test(document.getElementById('oTitle').textContent), null, { timeout: 30000 });
+  check('pagamento confirmado pelo retorno do checkout', true, await page.textContent('#oTitle'));
+
+  // ── 3b. inglês: 20 s pago em dólar pelo Stripe (entra na fila enquanto o vídeo da Maria é gerado)
+  const ectx = await browser.newContext({ viewport: { width: 1280, height: 860 }, acceptDownloads: true, locale: 'en-US' });
+  const ep = await ectx.newPage(); watch(ep, 'english');
+  await ep.goto(BASE + '/en');
+  await ep.waitForTimeout(800);
+  const enCard = nb(await ep.textContent('.price-card'));
+  check('EN: landing em inglês com preço em dólar', (await ep.getAttribute('html', 'lang')) === 'en' && enCard.includes('US$ 9.90') && enCard.includes('US$ 12.90') && !/vídeo|você/i.test(await ep.textContent('main')), enCard.replace(/\s+/g, ' ').slice(0, 80));
+  await ep.screenshot({ path: path.join(SHOTS, '20-en-inicio.png'), fullPage: true });
+  await ep.click('.hero-cta a.btn.primary');
+  await ep.waitForURL('**/en/create');
+  await ep.waitForFunction(() => window.PulsoEditor && PulsoEditor.state.engine, null, { timeout: 30000 });
+  await ep.fill('#f_name', 'Bean There Café');
+  await ep.selectOption('#f_segment', 'Cafeteria');
+  await ep.fill('#f_sells', 'Specialty coffee, pastries and breakfast to go');
+  await ep.fill('#f_diffs', 'Beans roasted weekly\nFresh pastries daily\nOrder by text');
+  await ep.fill('#f_whats', '(555) 010-0100');
+  await ep.click('#aiBtn');
+  await ep.waitForFunction(() => document.getElementById('f_hook1').value === 'COFFEE', null, { timeout: 15000 });
+  check('EN: roteiro com IA pedido em inglês', mocks.log.includes('ai:en') && (await ep.inputValue('#f_product')) === 'House cappuccino');
+  await ep.click('label:has(input[name=motion][value="premium"])');
+  await ep.click('label:has(input[name=dur][value="20"])');
+  await ep.waitForTimeout(400);
+  check('EN: animação Premium escolhida na prévia', await ep.evaluate(() => PulsoEditor.state.engine.events.style === 'premium'));
+  const enNow = await ep.evaluate(() => [...document.querySelectorAll('[data-price-now]')].map((e) => e.textContent.trim()));
+  check('EN: escolher 20 s muda o preço e a prévia', (await ep.evaluate(() => PulsoEditor.state.dur)) === 20 && enNow.every((t) => t === 'US$ 12.90') && (await ep.textContent('#specPill')).startsWith('20 s'), enNow.join(' | '));
+  await ep.screenshot({ path: path.join(SHOTS, '21-en-editor-20s.png') });
+  await ep.click('#buyBtn');
+  await ep.waitForSelector('.modal form');
+  check('EN: janela de cadastro em inglês', /Sign in|account/i.test(await ep.textContent('.modal')) && !/Criar conta|Senha/.test(await ep.textContent('.modal')));
+  await ep.fill('.modal input[name=name]', 'John Buyer');
+  await ep.fill('.modal input[name=email]', 'john@buyer.test');
+  await ep.fill('.modal input[name=password]', 'johns-password-1');
+  await ep.check('.modal input[name=accept]');
+  await ep.click('.modal button[type=submit]');
+  await ep.waitForURL(/\/stripe\/checkout\//, { timeout: 30000 });
+  const sn = [...mocks.sessions.values()].pop();
+  enOrder = sn.client_reference_id;
+  check('EN: sessão do Stripe em dólar com valor de 20 s', sn.amount_total === 1290 && sn.currency === 'usd' && sn.locale === 'en' && /^[a-z0-9]{16}$/.test(enOrder) && sn.success_url === `${BASE}/en/order/${enOrder}?session_id={CHECKOUT_SESSION_ID}` && /20s/.test(sn.product_name) && sn.stripe_version === '2024-06-20', `${sn.product_name}`);
+  await ep.click('#stripePay');
+  await ep.waitForURL(/\/en\/order\/[a-z0-9]{16}\?session_id=cs_test_/, { timeout: 30000 });
+  await ep.waitForFunction(() => /Payment confirmed|Rendering|ready/.test(document.getElementById('oTitle').textContent), null, { timeout: 30000 });
+  check('EN: pagamento confirmado (retorno + aviso assinado do Stripe)', true, await ep.textContent('#oTitle'));
+
+  // ── 3c. espanhol: editor e preço sem comprar
+  const sctx = await browser.newContext({ viewport: { width: 1280, height: 860 }, locale: 'es-MX' });
+  const sp = await sctx.newPage(); watch(sp, 'espanol');
+  await sp.goto(BASE + '/es/crear');
+  await sp.waitForFunction(() => window.PulsoEditor && PulsoEditor.state.engine, null, { timeout: 30000 });
+  await sp.fill('#f_name', 'Café La Esquina');
+  await sp.fill('#f_sells', 'Café de especialidad y pan dulce');
+  await sp.click('#aiBtn');
+  await sp.waitForFunction(() => document.getElementById('f_hook2').value === 'QUE ABRAZA', null, { timeout: 15000 });
+  await sp.click('label:has(input[name=dur][value="20"])');
+  await sp.waitForTimeout(500);
+  const esNow = await sp.evaluate(() => [...document.querySelectorAll('[data-price-now]')].map((e) => e.textContent.trim()));
+  check('ES: editor em espanhol, IA em espanhol e 20 s em dólar', (await sp.getAttribute('html', 'lang')) === 'es' && mocks.log.includes('ai:es') && esNow.every((t) => t === 'US$ 12.90'), esNow.join(' | '));
+  await sp.screenshot({ path: path.join(SHOTS, '22-es-editor.png') });
+  await sctx.close();
+
+  // ── 3d. volta para a Maria: espera o vídeo de 15 s
+  await page.waitForFunction(() => /Gerando/.test(document.getElementById('oTitle').textContent), null, { timeout: 60000 }).catch(() => {});
+  await page.waitForTimeout(8000);
+  await page.screenshot({ path: path.join(SHOTS, '04-gerando.png') });
+  const t0 = Date.now();
+  await page.waitForFunction(() => document.getElementById('oTitle').textContent.includes('pronto'), null, { timeout: 15 * 60e3, polling: 2000 });
+  check('vídeo gerado no servidor', true, `${((Date.now() - t0) / 1000).toFixed(0)} s depois do início do render`);
+  await page.waitForTimeout(1500);
+  await page.screenshot({ path: path.join(SHOTS, '05-pronto.png') });
+
+  // ── 4. download e conferência do MP4
+  const [dl] = await Promise.all([page.waitForEvent('download'), page.click('#oActions a.btn.primary')]);
+  const mp4 = path.join(DATA, 'baixado.mp4');
+  await dl.saveAs(mp4);
+  check('nome do arquivo baixado', dl.suggestedFilename() === 'pulso-cafe-ponto-doce.mp4', dl.suggestedFilename());
+  const p15 = probe(mp4);
+  check('MP4 H.264 1080x1920 + AAC, 15 s', p15.v && p15.v.width === 1080 && p15.v.height === 1920 && p15.a && p15.a.channels === 2 && Math.abs(p15.dur - 15) < 0.1, `${p15.v && p15.v.r_frame_rate} · ${p15.dur.toFixed(2)} s · ${(p15.size / 1e6).toFixed(1)} MB`);
+  const [dlc] = await Promise.all([page.waitForEvent('download'), page.click('#oActions a[href*="/cover"]')]);
+  const cover = path.join(DATA, 'capa.jpg'); await dlc.saveAs(cover);
+  const cp = JSON.parse(execFileSync('ffprobe', ['-v', 'error', '-show_entries', 'stream=width,height,codec_name', '-of', 'json', cover])).streams[0];
+  check('capa do Reels em 1080x1920', dlc.suggestedFilename() === 'pulso-cafe-ponto-doce-capa.jpg' && cp.width === 1080 && cp.height === 1920 && cp.codec_name === 'mjpeg', `${dlc.suggestedFilename()} ${cp.width}x${cp.height}`);
+
+  // ── 4b. vídeo de 20 s em inglês
+  await ep.waitForFunction(() => document.getElementById('oTitle').textContent.includes('ready'), null, { timeout: 15 * 60e3, polling: 2000 });
+  await ep.waitForTimeout(1200);
+  await ep.screenshot({ path: path.join(SHOTS, '23-en-pronto.png') });
+  check('EN: página do pedido em inglês', /Your video is ready/.test(await ep.textContent('#oTitle')) && /US\$ 12\.90/.test(await ep.textContent('main')) && !/Pedido|Baixar|vídeo/.test(await ep.textContent('main')));
+  const [dl2] = await Promise.all([ep.waitForEvent('download'), ep.click('#oActions a.btn.primary')]);
+  const mp20 = path.join(DATA, 'baixado-20s.mp4');
+  await dl2.saveAs(mp20);
+  const p20 = probe(mp20);
+  check('EN: MP4 de 20 s, 1080x1920 + AAC', dl2.suggestedFilename() === 'pulso-bean-there-cafe.mp4' && p20.v && p20.v.width === 1080 && p20.a && Math.abs(p20.dur - 20) < 0.1, `${dl2.suggestedFilename()} · ${p20.dur.toFixed(2)} s · ${(p20.size / 1e6).toFixed(1)} MB`);
+  const enSpec = await ep.evaluate(async (id) => (await (await fetch(`/api/orders/${id}/spec`)).json()).spec, enOrder);
+  check('EN: pedido guardou a animação Premium', enSpec.style.motion === 'premium' && enSpec.duration === 20 && enSpec.lang === 'en');
+
+  // ── 5. correção grátis
+  await page.click('#oActions a[href*="revisar"]');
+  await page.waitForURL(/\/criar\?revisar=/);
+  await page.waitForFunction(() => window.PulsoEditor && PulsoEditor.state.revise && PulsoEditor.state.engine, null, { timeout: 30000 });
+  check('correção abre com o nome e a duração travados', (await page.isDisabled('#f_name')) && (await page.isDisabled('input[name=dur][value="20"]')));
+  await page.fill('#f_tagline', 'Café fresquinho, todo dia.');
+  await page.screenshot({ path: path.join(SHOTS, '06-correcao.png') });
+  await page.click('#reviseBtn');
+  await page.waitForURL(/\/pedido\//);
+  await page.waitForFunction(() => document.getElementById('oTitle').textContent.includes('pronto') && !document.querySelector('#oActions a[href*="revisar"]'), null, { timeout: 15 * 60e3, polling: 2000 });
+  // reaproveita a sessão do navegador
+  const sess = (await ctx.cookies()).find((c) => c.name === 'pulso_sid');
+  const asMaria = async (p) => (await fetch(BASE + p, { headers: { cookie: `pulso_sid=${sess.value}` } }));
+  const o2 = await (await asMaria(`/api/orders/${orderId}`)).json();
+  check('correção gerou a versão 2 e zerou as correções', o2.order.version === 2 && o2.order.editsLeft === 0, `v${o2.order.version}`);
+  const rng = await fetch(`${BASE}/api/orders/${orderId}/video`, { headers: { cookie: `pulso_sid=${sess.value}`, range: 'bytes=0-1023' } });
+  check('vídeo aceita Range (Safari/iPhone)', rng.status === 206 && (await rng.arrayBuffer()).byteLength === 1024);
+  const rev2 = await (await fetch(`${BASE}/api/orders/${orderId}/revise`, { method: 'POST', headers: { cookie: `pulso_sid=${sess.value}`, 'content-type': 'application/json' }, body: JSON.stringify({ spec: o2.spec || {} }) })).json();
+  check('segunda correção é recusada', /já foi usada|pronto/.test(rev2.error || ''), rev2.error);
+
+  // ── 6. meus vídeos
+  await page.goto(BASE + '/meus-videos');
+  await page.waitForSelector('.vcard');
+  await page.screenshot({ path: path.join(SHOTS, '07-meus-videos.png') });
+  check('meus vídeos lista o pedido', (await page.textContent('.vgrid')).includes('Café Ponto Doce'));
+  await ep.goto(BASE + '/en/my-videos');
+  await ep.waitForSelector('.vcard');
+  const enCards = await ep.textContent('.vgrid');
+  check('EN: my videos em inglês com 20 s e dólar', enCards.includes('Bean There Café') && /20 s/.test(enCards) && enCards.includes('US$ 12.90'), enCards.replace(/\s+/g, ' ').slice(0, 100));
+  await ep.screenshot({ path: path.join(SHOTS, '24-en-my-videos.png') });
+
+  // ── 6b. minha marca: o próximo vídeo começa com a identidade do último
+  await page.evaluate(() => { try { localStorage.clear(); sessionStorage.clear(); } catch { /* ok */ } });
+  await page.goto(BASE + '/criar');
+  await page.waitForFunction(() => window.PulsoEditor && PulsoEditor.state.engine, null, { timeout: 30000 });
+  await page.waitForSelector('#brandNote:not([hidden])', { timeout: 10000 });
+  check('editor oferece a marca salva', (await page.textContent('#brandName')) === 'Café Ponto Doce');
+  await page.click('#brandUse');
+  await page.waitForFunction(() => document.getElementById('f_name').value === 'Café Ponto Doce' && PulsoEditor.state.images.logo, null, { timeout: 10000 });
+  check('marca aplicada: nome, contato, cores e logo', (await page.inputValue('#f_whats')) === '(11) 90000-1234' && (await page.inputValue('#f_c1')) === c1After && (await page.inputValue('#f_sells')).startsWith('Cafés especiais'));
+  await page.screenshot({ path: path.join(SHOTS, '07b-minha-marca.png') });
+
+  // ── 7. celular
+  const mctx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true });
+  const mp = await mctx.newPage(); watch(mp, 'celular');
+  await mp.goto(BASE + '/'); await mp.waitForTimeout(700);
+  await mp.screenshot({ path: path.join(SHOTS, '08-celular-inicio.png') });
+  for (const [p, shot] of [['/criar', '09-celular-editor.png'], ['/en/create', '25-celular-en-editor.png'], ['/es/crear', '26-celular-es-editor.png']]) {
+    await mp.goto(BASE + p); await mp.waitForFunction(() => window.PulsoEditor && PulsoEditor.state.engine, null, { timeout: 30000 }); await mp.waitForTimeout(900);
+    await mp.screenshot({ path: path.join(SHOTS, shot) });
+    const overflow = await mp.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
+    check(`editor sem rolagem lateral no celular (${p})`, overflow <= 1, `${overflow}px`);
+  }
+  for (const [p, shot] of [['/en', '27-celular-en-inicio.png'], ['/es', '28-celular-es-inicio.png']]) {
+    await mp.goto(BASE + p); await mp.waitForTimeout(700);
+    await mp.screenshot({ path: path.join(SHOTS, shot), fullPage: true });
+    const overflow = await mp.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
+    check(`página inicial sem rolagem lateral no celular (${p})`, overflow <= 1, `${overflow}px`);
+  }
+  await mctx.close();
+
+  // ── 8. segurança e regras pela API
+  const bob = client();
+  const s1 = await bob('POST', '/api/auth/signup', { name: 'Bob', email: 'bob@teste.test', password: 'senha-do-bob-1', accept: true });
+  check('cookie de sessão HttpOnly e SameSite', /HttpOnly/.test(s1.setCookie) && /SameSite=Lax/.test(s1.setCookie));
+  check('outra conta não vê o pedido da Maria', (await bob('GET', `/api/orders/${orderId}`)).status === 404);
+  check('outra conta não baixa o vídeo da Maria', (await bob('GET', `/api/orders/${orderId}/video`)).status === 404);
+  check('pedido de outro site é bloqueado (origem)', (await bob('POST', '/api/auth/logout', {}, { origin: 'https://site-malicioso.test' })).status === 403);
+  const big = await bob('POST', '/api/orders', JSON.stringify({ x: 'a'.repeat(13 * 1024 * 1024) }));
+  check('envio gigante é recusado', big.status === 413, String(big.status));
+  for (const p of ['/..%2fserver.js', '/%2e%2e/server.js', '/js/..%2f..%2fserver.js', '/.env', '/../.env', '/i18n/en.json', '/views/index.html']) {
+    let r = await bob('GET', p);
+    if (r.status === 301 || r.status === 302) r = await bob('GET', new URL(r.headers.get('location'), BASE).pathname); // ".html" vira endereço limpo
+    check(`arquivo interno protegido: ${p}`, r.status === 404 && !r.text.includes('createServer') && !r.text.includes('"pages"') && !r.text.includes('<!--HREFLANG-->'), String(r.status));
+  }
+  const bad = client(); let got429 = false;
+  for (let i = 0; i < 10; i++) { const r = await bad('POST', '/api/auth/login', { email: 'maria@cliente.test', password: 'errada-' + i }); if (r.status === 429) { got429 = true; break; } }
+  check('tentativas de senha são limitadas', got429);
+  const enErr = await client()('POST', '/api/auth/login', { email: 'ninguem@teste.test', password: 'qualquer-coisa' }, { 'x-lang': 'en' });
+  const esErr = await client()('POST', '/api/auth/login', { email: 'ninguem@teste.test', password: 'qualquer-coisa' }, { 'x-lang': 'es' });
+  check('mensagens de erro da API no idioma da página', enErr.json.error === 'Wrong email or password.' && /correo|contraseña/i.test(esErr.json.error), `${enErr.json.error} | ${esErr.json.error}`);
+  const headers = (await bob('GET', '/')).headers;
+  check('cabeçalhos de segurança', /default-src 'self'/.test(headers.get('content-security-policy') || '') && headers.get('x-frame-options') === 'DENY');
+  const bad2 = await bob('POST', '/api/orders', { spec: { brand: { name: '' } } });
+  check('pedido sem dados mínimos é recusado', bad2.status === 400, bad2.json && bad2.json.error);
+  const evil = await bob('POST', '/api/orders', { spec: JSON.parse(fs.readFileSync(path.join(ROOT, 'test/examples/petshop.json'))), logo: 'data:image/svg+xml;base64,PHN2Zz48L3N2Zz4=' });
+  check('imagem que não é PNG/JPG é recusada', evil.status === 400);
+  check('admin não pode ser confirmado por outra conta', (await bob('POST', '/api/admin/claim', { token: ADMIN_TOKEN })).status === 403);
+  // a empresa fictícia do exemplo do editor nunca vira pedido de cliente
+  const exOrder = await bob('POST', '/api/orders', { spec: JSON.parse(fs.readFileSync(path.join(ROOT, 'test/examples/confeitaria.json'))) });
+  check('pedido com a empresa do exemplo é recusado', exOrder.status === 400 && /exemplo/i.test((exOrder.json && exOrder.json.error) || ''), exOrder.json && exOrder.json.error);
+
+  // webhook do Mercado Pago: assinatura inválida, valor errado, e pagamento válido
+  const ob = await bob('POST', '/api/orders', { spec: JSON.parse(fs.readFileSync(path.join(ROOT, 'test/examples/petshop.json'))) });
+  const bobOrder = ob.json.order.id;
+  check('checkout criado para o pedido novo', !!ob.json.checkoutUrl);
+  const bobPref = [...mocks.prefs.values()].find((x) => x.external_reference === bobOrder);
+  const cheap = mocks.makePayment(bobPref, { amount: 1.0 });
+  const hook = (id, sig) => fetch(`${BASE}/api/webhooks/mercadopago?data.id=${id}&type=payment`, { method: 'POST', headers: { 'content-type': 'application/json', ...sig }, body: JSON.stringify({ type: 'payment', data: { id: String(id) } }) });
+  const w1 = await hook(cheap.id, { 'x-signature': 'ts=1,v1=' + 'a'.repeat(64), 'x-request-id': 'x' });
+  check('aviso com assinatura falsa é recusado', w1.status === 401);
+  const signed = (id) => { const ts = String(Date.now()), rid = 'req-' + id; return { 'x-signature': `ts=${ts},v1=${crypto.createHmac('sha256', mocks.webhookSecret).update(`id:${id};request-id:${rid};ts:${ts};`).digest('hex')}`, 'x-request-id': rid }; };
+  await hook(cheap.id, signed(cheap.id)); await sleep(700);
+  check('pagamento com valor menor não libera o vídeo', (await bob('GET', `/api/orders/${bobOrder}`)).json.order.status === 'awaiting_payment');
+  const good = mocks.makePayment(bobPref, {});
+  const w3 = await hook(good.id, signed(good.id)); await sleep(900);
+  const afterGood = (await bob('GET', `/api/orders/${bobOrder}`)).json.order.status;
+  check('aviso válido do Mercado Pago libera o vídeo', w3.status === 200 && ['paid', 'rendering'].includes(afterGood), afterGood);
+  // a Maria paga de novo o mesmo pedido (cobrança em dobro): fica registrada para devolver
+  const dup = mocks.makePayment(pref, {});
+  await hook(dup.id, signed(dup.id)); await sleep(700);
+
+  // webhook do Stripe: assinatura falsa, evento repetido e sessão de outro pedido
+  const stripeHook = (body, sigHeader) => fetch(`${BASE}/api/webhooks/stripe`, { method: 'POST', headers: { 'content-type': 'application/json', 'stripe-signature': sigHeader }, body });
+  const fakeBody = JSON.stringify({ type: 'checkout.session.completed', data: { object: { id: sn.id } } });
+  const sBad = await stripeHook(fakeBody, `t=${Math.floor(Date.now() / 1000)},v1=${'b'.repeat(64)}`);
+  const sOld = await stripeHook(fakeBody, `t=${Math.floor(Date.now() / 1000) - 3600},v1=${crypto.createHmac('sha256', mocks.stripeWebhookSecret).update(`${Math.floor(Date.now() / 1000) - 3600}.${fakeBody}`).digest('hex')}`);
+  check('aviso do Stripe com assinatura falsa ou antiga é recusado', sBad.status === 400 && sOld.status === 400, `${sBad.status}/${sOld.status}`);
+  const again = await mocks.stripeEvent('checkout.session.completed', sn); await sleep(500);
+  const enAfter = await (await fetch(`${BASE}/api/orders/${enOrder}`, { headers: { cookie: (await ectx.cookies()).filter((c) => c.name === 'pulso_sid').map((c) => `pulso_sid=${c.value}`).join('') } })).json();
+  check('aviso repetido do Stripe não muda nada', again === 200 && enAfter.order.status === 'ready', enAfter.order.status);
+
+  // ── 9. admin: confirmação com ADMIN_TOKEN, vendas por moeda, cobrança em dobro, reembolsos
+  const actx = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+  const ap = await actx.newPage(); watch(ap, 'admin');
+  ap.on('dialog', (d) => d.accept());
+  await ap.goto(BASE + '/entrar?modo=cadastro&volta=/admin');
+  await ap.fill('input[name=name]', 'Dono'); await ap.fill('input[name=email]', ADMIN); await ap.fill('input[name=password]', 'senha-do-dono-1'); await ap.check('input[name=accept]');
+  await ap.click('button[type=submit]');
+  await ap.waitForURL('**/admin'); await ap.waitForSelector('#claim:not([hidden])');
+  check('e-mail de admin precisa confirmar o código', await ap.isHidden('#admin'));
+  await ap.fill('#claimToken', 'codigo-errado'); await ap.click('#claimForm button');
+  await ap.waitForFunction(() => document.getElementById('claimMsg').textContent.length > 0);
+  check('código errado é recusado', (await ap.textContent('#claimMsg')).includes('incorreto'), await ap.textContent('#claimMsg'));
+  await ap.fill('#claimToken', ADMIN_TOKEN); await ap.click('#claimForm button');
+  await ap.waitForSelector('#kpis .kpi');
+  await ap.waitForTimeout(800);
+  await ap.screenshot({ path: path.join(SHOTS, '10-admin.png'), fullPage: true });
+  const kpi = nb(await ap.textContent('#kpis'));
+  check('painel mostra as vendas em reais e em dólar', kpi.includes('R$ 59,80') && kpi.includes('US$ 12.90'), kpi.replace(/\s+/g, ' ').slice(0, 120));
+  const alerts = await ap.textContent('#alerts');
+  check('painel alerta valor errado e cobrança em dobro', alerts.includes('Pagamento diferente') && alerts.includes('Cobrança em dobro'));
+  check('painel mostra Stripe e Mercado Pago ligados', (await ap.textContent('#cfg')).includes('Stripe ligado') && (await ap.textContent('#cfg')).includes('Mercado Pago ligado'));
+  check('conta comum não acessa o admin', (await bob('GET', '/api/admin/summary')).status === 404);
+  // devolve só a cobrança extra da Maria (o pedido continua pronto)
+  await ap.click(`tr[data-open="${orderId}"]`);
+  await ap.waitForSelector(`#drawer [data-refund-pay="${dup.id}"]`);
+  await ap.screenshot({ path: path.join(SHOTS, '11-admin-pedido.png') });
+  await ap.click(`#drawer [data-refund-pay="${dup.id}"]`);
+  await ap.waitForTimeout(1200);
+  const mariaNow = (await (await asMaria(`/api/orders/${orderId}`)).json()).order.status;
+  const mariaFirst = [...mocks.payments.values()].find((x) => x.external_reference === orderId && x.id !== dup.id);
+  check('devolve a cobrança em dobro e o pedido continua pronto', mocks.payments.get(String(dup.id)).status === 'refunded' && mariaFirst.status === 'approved' && mariaNow === 'ready', mariaNow);
+  // reembolso do pedido do Bob (Mercado Pago)
+  await ap.keyboard.press('Escape');
+  await ap.click(`tr[data-open="${bobOrder}"]`);
+  await ap.waitForSelector('#drawer [data-act="refund"]');
+  await ap.click('#drawer [data-act="refund"]');
+  await ap.waitForTimeout(1200);
+  check('reembolso pelo painel (Mercado Pago)', (await bob('GET', `/api/orders/${bobOrder}`)).json.order.status === 'refunded' && mocks.payments.get(String(good.id)).status === 'refunded');
+  // reembolso do pedido em dólar (Stripe)
+  await ap.keyboard.press('Escape');
+  await ap.click(`tr[data-open="${enOrder}"]`);
+  await ap.waitForSelector('#drawer [data-act="refund"]');
+  await ap.click('#drawer [data-act="refund"]');
+  await ap.waitForTimeout(1200);
+  const enRef = await (await fetch(`${BASE}/api/admin/orders/${enOrder}`, { headers: { cookie: (await actx.cookies()).filter((c) => c.name === 'pulso_sid').map((c) => `pulso_sid=${c.value}`).join('') } })).json();
+  check('reembolso pelo painel (Stripe)', enRef.order.status === 'refunded' && mocks.refunds.length === 1 && mocks.refunds[0].payment_intent === sn.payment_intent, `${enRef.order.status} · ${mocks.refunds.length} reembolso(s)`);
+  await ep.goto(`${BASE}/en/order/${enOrder}`); await ep.waitForTimeout(1500);
+  check('EN: página do pedido mostra o reembolso em inglês', /refunded/i.test(await ep.textContent('#oTitle')), await ep.textContent('#oTitle'));
+  const reset = await ap.evaluate(async () => { const u = (await (await fetch('/api/admin/users?q=john')).json()).users[0]; return (await (await fetch(`/api/admin/users/${u.id}/reset-link`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' })).json()).url; });
+  check('link de nova senha no idioma do cliente', reset.startsWith(`${BASE}/en/new-password#`), reset.split('#')[0]);
+  const token = reset.split('#')[1];
+  const rr = await client()('POST', '/api/auth/reset', { token, password: 'johns-new-password' });
+  const relog = await client()('POST', '/api/auth/login', { email: 'john@buyer.test', password: 'johns-new-password' });
+  check('link de nova senha funciona uma vez', rr.status === 200 && relog.status === 200 && (await client()('POST', '/api/auth/reset', { token, password: 'outra-senha-123' })).status === 400);
+  const backup = await ap.evaluate(async () => { const r = await fetch('/api/admin/backup'); const b = await r.arrayBuffer(); return { s: r.status, n: b.byteLength, head: String.fromCharCode(...new Uint8Array(b.slice(0, 15))) }; });
+  check('backup do banco', backup.s === 200 && backup.head === 'SQLite format 3', `${backup.n} bytes`);
+  await actx.close();
+  await ectx.close();
+  await ctx.close();
+} catch (e) {
+  check('execução sem erro', false, e.stack || e.message);
+} finally {
+  check('páginas sem erro de JavaScript', pageErrors.length === 0, pageErrors.slice(0, 5).join(' | '));
+  await browser.close();
+  srv.kill('SIGTERM'); mocks.close();
+  fs.writeFileSync(path.join(DATA, 'server.log'), srvLog.join(''));
+  const fails = results.filter((r) => !r.ok);
+  console.log(`\n${results.length - fails.length}/${results.length} verificações OK${fails.length ? ` — falharam: ${fails.map((f) => f.name).join('; ')}` : ''}`);
+  process.exitCode = fails.length ? 1 : 0;
+}

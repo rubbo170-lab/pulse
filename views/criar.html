@@ -1,0 +1,151 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Criar vídeo · Pulso</title>
+<meta name="description" content="Monte o vídeo animado da sua empresa e veja a prévia na hora.">
+<meta name="theme-color" content="#121016">
+<!--HREFLANG-->
+<link rel="icon" href="/img/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/css/site.css">
+<link rel="stylesheet" href="/css/editor.css">
+</head>
+<body class="has-mbar">
+<header class="site-head"><div class="wrap">
+  <a class="logo" href="/" aria-label="Pulso, página inicial"><svg viewBox="0 0 34 34" aria-hidden="true"><rect x="1" y="1" width="32" height="32" rx="10" fill="#7C5CFF"/><path d="M5 18h6l2.5-7 4 13 3-9 1.6 3H29" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg><span>pulso</span></a>
+  <nav class="nav" aria-label="Principal">
+    <a class="lnk" href="/meus-videos" data-auth="in" hidden>Meus vídeos</a>
+    <a class="lnk" href="/entrar?volta=/criar" data-auth="out">Entrar</a>
+    <button class="btn small ghost" type="button" data-auth="in" data-logout hidden>Sair</button>
+  </nav>
+</div></header>
+
+<main class="wrap editor">
+  <div class="ed-head">
+    <div><h1 class="h-display" id="edTitle">Monte seu vídeo</h1><p id="edSub">Preencha as etapas e veja a prévia mudar na hora.</p></div>
+    <span class="spec-pill" id="specPill">15 s · 1080×1920 · 60 fps</span>
+  </div>
+
+  <div class="grid">
+    <section class="form">
+      <div class="note" id="exampleNote"><span><b>Exemplo</b> com uma empresa fictícia. Troque pelos dados da sua.</span><button class="btn small ghost" id="clearBtn" type="button">Começar do zero</button></div>
+      <div class="note brand" id="brandNote" hidden><span class="bn"><span>Sua marca: <b id="brandName"></b></span><small>Logo, cores, estilo e contatos do último vídeo</small></span><button class="btn small primary" id="brandUse" type="button">Usar minha marca</button><button class="btn small ghost" id="brandHide" type="button">Agora não</button><button class="link-btn" id="brandForget" type="button">Esquecer marca</button></div>
+      <div class="note info" id="reviseNote" hidden><span><b>Correção grátis.</b> Ajuste os textos e gere uma nova versão. O nome da empresa e as imagens continuam os mesmos.</span></div>
+
+      <article class="panel" aria-labelledby="h1">
+        <header><span class="num">01</span><h2 id="h1">Sua empresa</h2></header>
+        <div class="fields">
+          <label class="fld"><span>Nome da empresa <i data-count="f_name"></i></span><input type="text" id="f_name" maxlength="32" autocomplete="organization"></label>
+          <label class="fld"><span>Segmento</span><select id="f_segment"></select></label>
+          <label class="fld full"><span>O que você vende e para quem? <i data-count="f_sells"></i></span><textarea id="f_sells" maxlength="280" rows="2" placeholder="Ex.: bolos de pote e doces para festas, entregues no bairro"></textarea></label>
+          <label class="fld full"><span>Diferenciais (um por linha) <i data-count="f_diffs"></i></span><textarea id="f_diffs" maxlength="280" rows="3" placeholder="Ex.: feito no mesmo dia&#10;entrega no bairro"></textarea></label>
+          <label class="fld"><span>Oferta (opcional) <i data-count="f_offer"></i></span><input type="text" id="f_offer" maxlength="26" placeholder="Ex.: 10% OFF no 1º pedido"></label>
+          <label class="fld"><span>WhatsApp</span><input type="tel" id="f_whats" maxlength="24" placeholder="(11) 90000-0000"></label>
+          <label class="fld"><span>Instagram</span><input type="text" id="f_insta" maxlength="32" placeholder="@suaempresa"></label>
+          <label class="fld"><span>Site</span><input type="text" id="f_site" maxlength="48" placeholder="suaempresa.com.br" inputmode="url"></label>
+          <label class="fld full"><span>Endereço (opcional)</span><input type="text" id="f_addr" maxlength="70"></label>
+        </div>
+        <div class="sub">Prova social (só números reais)</div>
+        <div class="fields">
+          <label class="fld"><span>Nota de avaliação</span><input type="text" id="f_rating" maxlength="4" placeholder="Ex.: 4,9"></label>
+          <label class="fld"><span>Onde foi avaliada</span><input type="text" id="f_ratingSrc" maxlength="18" placeholder="Ex.: Google"></label>
+          <label class="fld"><span>Clientes / pedidos</span><input type="text" id="f_customers" maxlength="12" placeholder="Ex.: +1.200"></label>
+          <label class="fld"><span>Legenda do número</span><input type="text" id="f_customersLabel" maxlength="24" placeholder="Ex.: clientes atendidos"></label>
+        </div>
+      </article>
+
+      <article class="panel" aria-labelledby="h2">
+        <header><span class="num">02</span><h2 id="h2">Visual e som</h2></header>
+        <div class="uploads">
+          <div class="drop" id="d_logo"><div class="thumb" id="t_logo"></div><div class="meta"><b>Logo</b><small id="n_logo">PNG ou JPG, opcional</small></div><button class="btn small x" id="x_logo" type="button" hidden>Remover</button><input type="file" id="f_logo" accept="image/png,image/jpeg,image/webp" aria-label="Enviar logo"></div>
+          <div class="drop" id="d_photo"><div class="thumb" id="t_photo"></div><div class="meta"><b>Foto do produto</b><small id="n_photo">Opcional. Foto vertical fica melhor</small></div><button class="btn small x" id="x_photo" type="button" hidden>Remover</button><input type="file" id="f_photo" accept="image/png,image/jpeg,image/webp" aria-label="Enviar foto do produto"></div>
+        </div>
+        <div class="colors">
+          <div class="swatch"><input type="color" id="f_c1" aria-label="Cor principal"><label for="f_c1">Principal<code id="c1v"></code></label></div>
+          <div class="swatch"><input type="color" id="f_c2" aria-label="Cor de destaque"><label for="f_c2">Destaque<code id="c2v"></code></label></div>
+          <button class="btn small" id="logoColors" type="button" hidden>Usar cores do logo</button>
+        </div>
+        <div class="sub">Animação</div>
+        <div class="choices two" role="radiogroup" aria-label="Animação">
+          <label class="choice moods"><input type="radio" name="motion" value="dinamico" checked><span><b>Dinâmico</b><small>Impacto, brilho e cortes rápidos</small></span></label>
+          <label class="choice moods"><input type="radio" name="motion" value="premium"><span><b>Premium</b><small>Limpo e elegante, palavra por palavra</small></span></label>
+        </div>
+        <div class="sub">Estilo das letras</div>
+        <div class="choices" role="radiogroup" aria-label="Estilo das letras">
+          <label class="choice"><input type="radio" name="style" value="moderno"><span><b style="font-family:'Bricolage Grotesque',sans-serif">Aa</b>Moderno<small>Direto e atual</small></span></label>
+          <label class="choice"><input type="radio" name="style" value="impacto"><span><b style="font-family:'Big Shoulders Display',sans-serif">AA</b>Impacto<small>Promoções e comida</small></span></label>
+          <label class="choice"><input type="radio" name="style" value="elegante"><span><b style="font-family:'Gloock',serif;font-weight:400">Aa</b>Elegante<small>Beleza, saúde, moda</small></span></label>
+        </div>
+        <div class="sub">Trilha</div>
+        <div class="choices" role="radiogroup" aria-label="Trilha">
+          <label class="choice moods"><input type="radio" name="mood" value="energia"><span><b>Energia</b><small>Batida forte</small></span></label>
+          <label class="choice moods"><input type="radio" name="mood" value="suave"><span><b>Suave</b><small>Leve e elegante</small></span></label>
+          <label class="choice moods"><input type="radio" name="mood" value="nenhuma"><span><b>Só efeitos</b><small>Sem música</small></span></label>
+        </div>
+        <div class="sub">Duração</div>
+        <div class="choices two" role="radiogroup" aria-label="Duração">
+          <label class="choice moods"><input type="radio" name="dur" value="15" checked><span><b>15 segundos</b><small>Rápido e animado</small><em class="dprice" data-price="15">R$ 29,90</em></span></label>
+          <label class="choice moods"><input type="radio" name="dur" value="20"><span><b>20 segundos</b><small>Mais tempo para ler cada cena</small><em class="dprice" data-price="20">R$ 34,90</em></span></label>
+        </div>
+      </article>
+
+      <article class="panel" aria-labelledby="h3">
+        <header><span class="num">03</span><h2 id="h3">Roteiro</h2></header>
+        <div class="ai-row">
+          <button class="btn primary" id="aiBtn" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l1.8 6.2L20 11l-6.2 1.8L12 19l-1.8-6.2L4 11l6.2-1.8z" fill="currentColor"/></svg><span id="aiLabel">Escrever roteiro com IA</span></button>
+          <span class="ai-status" id="aiStatus" aria-live="polite">Usa os dados da etapa 01. Você pode editar tudo depois.</span>
+        </div>
+        <div class="fields">
+          <label class="fld"><span>Gancho, linha 1 <i data-count="f_hook1"></i></span><input type="text" id="f_hook1" maxlength="14"></label>
+          <label class="fld"><span>Gancho, linha 2 <i data-count="f_hook2"></i></span><input type="text" id="f_hook2" maxlength="18"></label>
+          <label class="fld full"><span>Problema do cliente <i data-count="f_pain"></i></span><input type="text" id="f_pain" maxlength="40"></label>
+          <label class="fld full"><span>O que o cliente digita na busca <i data-count="f_search"></i></span><input type="text" id="f_search" maxlength="40"></label>
+          <label class="fld full"><span>Produto ou serviço em destaque <i data-count="f_product"></i></span><input type="text" id="f_product" maxlength="40"></label>
+          <label class="fld full"><span>Título das vantagens <i data-count="f_benTitle"></i></span><input type="text" id="f_benTitle" maxlength="30"></label>
+        </div>
+        <div class="bens" id="bens"></div>
+        <div class="fields">
+          <label class="fld full"><span>Slogan final <i data-count="f_tagline"></i></span><input type="text" id="f_tagline" maxlength="44"></label>
+          <label class="fld full"><span>Chamada para ação <i data-count="f_cta"></i></span><input type="text" id="f_cta" maxlength="24"></label>
+        </div>
+      </article>
+    </section>
+
+    <aside class="monitor" aria-label="Prévia do vídeo">
+      <div class="stage"><canvas id="pv" width="540" height="960" aria-label="Prévia do vídeo"></canvas></div>
+      <div class="transport">
+        <button class="btn round" id="playBtn" type="button" aria-label="Pausar"><svg viewBox="0 0 24 24" id="playIcon" aria-hidden="true"><path d="M7 5h3.5v14H7zM13.5 5H17v14h-3.5z" fill="currentColor"/></svg></button>
+        <button class="btn small" id="soundBtn" type="button" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z" fill="currentColor"/><path d="M15.5 9a4 4 0 0 1 0 6M18 6.5a7.5 7.5 0 0 1 0 11" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg><span>Ouvir</span></button>
+        <span class="tc mono" id="tc">00.00 / 15.00</span>
+      </div>
+      <div class="timeline" id="tl" role="slider" aria-label="Posição no vídeo" aria-valuemin="0" aria-valuemax="15" aria-valuenow="0" tabindex="0"><div class="playhead" id="ph"></div></div>
+      <div class="scene" id="sceneName">Cena: <b>Gancho</b></div>
+
+      <div class="buy" id="buyBox">
+        <div class="buy-price"><b data-price="15" data-price-now>R$ 29,90</b><span>vídeo em alta, sem a marca PRÉVIA</span></div>
+        <button class="btn primary big block" id="buyBtn" type="button">Comprar este vídeo</button>
+        <p class="status" id="status" aria-live="polite"></p>
+        <p class="fine">Pix ou cartão pelo Mercado Pago. O vídeo final é igual a esta prévia, em alta resolução e 60 quadros por segundo. Inclui 1 correção de texto grátis.</p>
+      </div>
+      <div class="buy" id="reviseBox" hidden>
+        <div class="buy-price"><b>Correção grátis</b><span id="reviseInfo"></span></div>
+        <button class="btn primary big block" id="reviseBtn" type="button">Gerar nova versão</button>
+        <a class="btn ghost block" id="reviseCancel" href="/meus-videos">Voltar sem mudar</a>
+        <p class="status" id="reviseStatus" aria-live="polite"></p>
+      </div>
+    </aside>
+  </div>
+</main>
+<footer class="site-foot"><div class="wrap"><nav class="langs" aria-label="Idioma"><!--LANGS--></nav></div></footer>
+
+<div class="mbar" id="mbar"><div><b data-price="15" data-price-now>R$ 29,90</b><small>vídeo em alta, sem a marca PRÉVIA</small></div><button class="btn primary" id="mbarBtn" type="button">Comprar vídeo</button></div>
+
+<script src="/i18n/pt.js"></script>
+<script src="/js/common.js"></script>
+<script src="/js/engine_util.js"></script>
+<script src="/js/engine.js"></script>
+<script src="/js/audio.js"></script>
+<script src="/js/editor.js"></script>
+</body>
+</html>
