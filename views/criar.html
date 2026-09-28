@@ -84,9 +84,10 @@
           <label class="choice moods"><input type="radio" name="mood" value="nenhuma"><span><b>Só efeitos</b><small>Sem música</small></span></label>
         </div>
         <div class="sub">Duração</div>
-        <div class="choices two" role="radiogroup" aria-label="Duração">
+        <div class="choices dur" role="radiogroup" aria-label="Duração">
           <label class="choice moods"><input type="radio" name="dur" value="15" checked><span><b>15 segundos</b><small>Rápido e animado</small><em class="dprice" data-price="15">R$ 29,90</em></span></label>
           <label class="choice moods"><input type="radio" name="dur" value="20"><span><b>20 segundos</b><small>Mais tempo para ler cada cena</small><em class="dprice" data-price="20">R$ 34,90</em></span></label>
+          <label class="choice moods"><input type="radio" name="dur" value="30"><span><b>30 segundos</b><small>Mais cenas: suas fotos em detalhe, passo a passo e depoimento</small><em class="dprice" data-price="30">R$ 44,90</em></span></label>
         </div>
       </article>
 
@@ -110,6 +111,28 @@
           <label class="fld full"><span>Chamada para ação <i data-count="f_cta"></i></span><input type="text" id="f_cta" maxlength="24"></label>
         </div>
       </article>
+
+      <article class="panel" id="panel30" aria-labelledby="h4" hidden>
+        <header><span class="num">04</span><h2 id="h4">Cenas do vídeo de 30 s</h2></header>
+        <div class="sub">Fotos e prints (até 3)</div>
+        <p class="hint">Cardápio, produtos, site, app ou Instagram. No vídeo, cada imagem vira peças que se montam, com zoom na parte principal.</p>
+        <div class="uploads three">
+          <div class="drop" id="d_g0"><div class="thumb" id="t_g0"></div><div class="meta"><b>Imagem 1</b><small id="n_g0">A principal</small></div><button class="btn small x" id="x_g0" type="button" hidden>Remover</button><input type="file" id="f_g0" accept="image/png,image/jpeg,image/webp" aria-label="Enviar imagem 1"></div>
+          <div class="drop" id="d_g1"><div class="thumb" id="t_g1"></div><div class="meta"><b>Imagem 2</b><small id="n_g1">Opcional</small></div><button class="btn small x" id="x_g1" type="button" hidden>Remover</button><input type="file" id="f_g1" accept="image/png,image/jpeg,image/webp" aria-label="Enviar imagem 2"></div>
+          <div class="drop" id="d_g2"><div class="thumb" id="t_g2"></div><div class="meta"><b>Imagem 3</b><small id="n_g2">Opcional</small></div><button class="btn small x" id="x_g2" type="button" hidden>Remover</button><input type="file" id="f_g2" accept="image/png,image/jpeg,image/webp" aria-label="Enviar imagem 3"></div>
+        </div>
+        <div class="fields">
+          <label class="fld full"><span>Título das fotos <i data-count="f_showTitle"></i></span><input type="text" id="f_showTitle" maxlength="26" placeholder="Ex.: Nosso cardápio"></label>
+          <label class="fld full"><span>Título do passo a passo <i data-count="f_stepsTitle"></i></span><input type="text" id="f_stepsTitle" maxlength="26" placeholder="Ex.: Como pedir"></label>
+        </div>
+        <div class="bens" id="stepsBox"></div>
+        <div class="sub">Depoimento de cliente (opcional)</div>
+        <p class="hint">Só depoimentos reais, com autorização de quem falou. Sem depoimento, o vídeo mostra a oferta ou a sua principal vantagem.</p>
+        <div class="fields">
+          <label class="fld full"><span>O que o cliente disse <i data-count="f_quote"></i></span><textarea id="f_quote" maxlength="90" rows="2"></textarea></label>
+          <label class="fld full"><span>Nome de quem disse <i data-count="f_author"></i></span><input type="text" id="f_author" maxlength="28" placeholder="Ex.: Ana P., cliente"></label>
+        </div>
+      </article>
     </section>
 
     <aside class="monitor" aria-label="Prévia do vídeo">
@@ -121,6 +144,7 @@
       </div>
       <div class="timeline" id="tl" role="slider" aria-label="Posição no vídeo" aria-valuemin="0" aria-valuemax="15" aria-valuenow="0" tabindex="0"><div class="playhead" id="ph"></div></div>
       <div class="scene" id="sceneName">Cena: <b>Gancho</b></div>
+      <div class="board" id="board" aria-label="Storyboard: toque numa cena para ir até ela"></div>
 
       <div class="buy" id="buyBox">
         <div class="buy-price"><b data-price="15" data-price-now>R$ 29,90</b><span>vídeo em alta, sem a marca PRÉVIA</span></div>

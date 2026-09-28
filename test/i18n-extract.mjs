@@ -12,9 +12,9 @@ for (const f of jsFiles) {
 }
 // strings indiretas usadas com T(variável)
 const editor = fs.readFileSync(path.join(ROOT, 'public/js/editor.js'), 'utf8');
-for (const k of ['SEGMENTS', 'SCENES']) { const m = new RegExp(`const ${k} = \\[([^\\]]*)\\]`).exec(editor); m[1].match(/'([^']+)'/g).forEach((s) => out.js.add(s.slice(1, -1))); }
-const icons = /const ICON_LABELS = \{([^}]*)\}/.exec(editor)[1]; for (const m of icons.matchAll(/:\s*'([^']+)'/g)) out.js.add(m[1]);
-['Prova', 'Oferta', 'Frase', 'PNG ou JPG, opcional', 'Opcional. Foto vertical fica melhor'].forEach((s) => out.js.add(s));
+/const SEGMENTS = \[([^\]]*)\]/.exec(editor)[1].match(/'([^']+)'/g).forEach((s) => out.js.add(s.slice(1, -1)));
+for (const k of ['SCENE_LABEL', 'ICON_LABELS']) { const m = new RegExp(`const ${k} = \\{([\\s\\S]*?)\\};`).exec(editor); for (const x of m[1].matchAll(/:\s*'([^']+)'/g)) out.js.add(x[1]); }
+const upl = /const UPL = \{([\s\S]*?)\};/.exec(editor)[1]; for (const m of upl.matchAll(/'([^']+)'\]/g)) out.js.add(m[1]);
 ['Aguardando pagamento', 'Na fila', 'Gerando o vídeo', 'Pronto', 'Falhou', 'Reembolsado', 'Expirado'].forEach((s) => out.js.add(s));
 for (const f of ['server.js', ...fs.readdirSync(path.join(ROOT, 'lib')).filter((x) => x.endsWith('.js')).map((x) => 'lib/' + x)]) {
   const src = fs.readFileSync(path.join(ROOT, f), 'utf8');

@@ -30,6 +30,29 @@ const PulsoAudio = (() => {
     return ctx;
   }
 
+  // Janela [a, b) da partitura (vídeo de 30 s): só tocam as notas e efeitos que COMEÇAM dentro da janela, deslocados para
+  // começar em 0; o que começou antes fica no pedaço anterior (com a cauda de reverb dele). Automações antes de `a` são ignoradas.
+  function windowed(ctx, a, b) {
+    const patchParam = (p) => {
+      if (!p || p.__win) return;
+      p.__win = true;
+      const sv = p.setValueAtTime.bind(p), lr = p.linearRampToValueAtTime.bind(p), er = p.exponentialRampToValueAtTime.bind(p), st = p.setTargetAtTime.bind(p), sc = p.setValueCurveAtTime.bind(p);
+      p.setValueAtTime = (v, t) => (t >= a ? sv(v, t - a) : p);
+      p.linearRampToValueAtTime = (v, t) => (t >= a ? lr(v, t - a) : p);
+      p.exponentialRampToValueAtTime = (v, t) => (t >= a ? er(v, t - a) : p);
+      p.setTargetAtTime = (v, t, tau) => (t >= a ? st(v, t - a, tau) : p);
+      p.setValueCurveAtTime = (c, t, d) => (t >= a ? sc(c, t - a, d) : p);
+    };
+    const patchNode = (n) => {
+      for (const key of ['frequency', 'detune', 'gain', 'Q', 'pan', 'playbackRate', 'delayTime']) if (n[key] instanceof AudioParam) patchParam(n[key]);
+      if (typeof n.start === 'function') { const s0 = n.start.bind(n); n.start = (w = 0, off, dur) => { if (w < a || w >= b) { n.__skip = true; return; } if (dur !== undefined) s0(w - a, off, dur); else if (off !== undefined) s0(w - a, off); else s0(w - a); }; }
+      if (typeof n.stop === 'function') { const s1 = n.stop.bind(n); n.stop = (w = 0) => { if (!n.__skip) s1(Math.max(0, w - a)); }; }
+      return n;
+    };
+    for (const m of ['createOscillator', 'createGain', 'createBiquadFilter', 'createBufferSource', 'createStereoPanner', 'createDelay']) { const f = ctx[m].bind(ctx); ctx[m] = (...args) => patchNode(f(...args)); }
+    return ctx;
+  }
+
   function rngf(seed) { let a = seed >>> 0; return () => { a = (a + 0x6d2b79f5) >>> 0; let t = a; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
 
   function makeKit(ctx, seed) {
@@ -154,9 +177,34 @@ const PulsoAudio = (() => {
   const CH = { F: [53, 57, 60, 64], C: [48, 55, 60, 64], G: [55, 59, 62, 67], Am: [57, 60, 64, 67], Fadd9: [53, 57, 60, 64, 67], Fmaj7: [53, 57, 60, 64], Em7: [52, 55, 59, 62], Dm7: [50, 53, 57, 60], Cmaj7: [48, 52, 55, 59], Cmaj9: [48, 52, 55, 59, 62] };
   const ROOT = { F: 29, C: 36, G: 31, Am: 33, Fmaj7: 29, Em7: 28, Dm7: 26, Cmaj7: 36 };
 
+  // barramentos de mixagem (bateria, música, efeitos, reverb e eco), iguais na partitura e nos capítulos do vídeo de 30 s
+  function buses(ctx, K, mood, k = 1) {
+    const master = ctx.createGain(); master.gain.value = 0.9;
+    const comp = ctx.createDynamicsCompressor(); comp.threshold.value = -14; comp.knee.value = 10; comp.ratio.value = 3; comp.attack.value = 0.005; comp.release.value = 0.15;
+    master.connect(comp).connect(ctx.destination);
+    const drums = ctx.createGain(); drums.connect(master);
+    const music = ctx.createGain(); music.connect(master);
+    const sfx = ctx.createGain(); sfx.gain.value = mood === 'suave' ? 0.85 : 1; sfx.connect(master);
+    const conv = ctx.createConvolver(); conv.normalize = true; conv.buffer = K.ir; const revOut = ctx.createGain(); revOut.gain.value = 0.9; conv.connect(revOut).connect(master);
+    const rev = (v) => { const gn = ctx.createGain(); gn.gain.value = v; gn.connect(conv); return gn; };
+    const dl = ctx.createDelay(1), dr = ctx.createDelay(1), fb = ctx.createGain(), dlp = ctx.createBiquadFilter(), merge = ctx.createChannelMerger(2), dIn = ctx.createGain();
+    dl.delayTime.value = ((3 * BEAT) / 4) * k; dr.delayTime.value = ((3 * BEAT) / 4) * k; fb.gain.value = 0.36; dlp.type = 'lowpass'; dlp.frequency.value = 4500;
+    dIn.connect(dl); dl.connect(dlp); dlp.connect(dr); dr.connect(fb); fb.connect(dl); dl.connect(merge, 0, 0); dr.connect(merge, 0, 1); const dOut = ctx.createGain(); dOut.gain.value = 0.5; merge.connect(dOut).connect(music);
+    const both = (dest, rv = 0, dly = 0) => { const n = ctx.createGain(); n.connect(dest); if (rv) n.connect(rev(rv)); if (dly) { const d2 = ctx.createGain(); d2.gain.value = dly; n.connect(d2).connect(dIn); } return n; };
+    return { master, drums, music, sfx, both };
+  }
+
   async function render(ev, opts = {}) {
-    const mood = opts.mood || ev.mood || 'energia', seed = opts.seed || 7, k = opts.scale && opts.scale > 0 ? opts.scale : 1;
-    const ctx = timeScaled(new OfflineAudioContext(2, Math.ceil(SR * LEN * k), SR), k), K = makeKit(ctx, seed), I = instruments(ctx, K);
+    if (ev.dur === 30) return render30(ev, opts);
+    const k = opts.scale && opts.scale > 0 ? opts.scale : 1;
+    return master(await score(ev, opts), Math.floor(SR * T15 * k));
+  }
+
+  // a partitura do vídeo de 15 s (esticada para 20 s com scale, ou um pedaço dela com window: [a, b])
+  async function score(ev, opts = {}) {
+    const mood = opts.mood || ev.mood || 'energia', seed = opts.seed || 7, win = opts.window || null, k = win ? 1 : opts.scale && opts.scale > 0 ? opts.scale : 1;
+    const base = new OfflineAudioContext(2, Math.ceil(SR * (win ? win[1] - win[0] + 3.2 : LEN * k)), SR);
+    const ctx = win ? windowed(base, win[0], win[1]) : timeScaled(base, k), K = makeKit(ctx, seed), I = instruments(ctx, K);
     const master = ctx.createGain(); master.gain.value = 0.9;
     const comp = ctx.createDynamicsCompressor(); comp.threshold.value = -14; comp.knee.value = 10; comp.ratio.value = 3; comp.attack.value = 0.005; comp.release.value = 0.15;
     master.connect(comp).connect(ctx.destination);
@@ -200,11 +248,13 @@ const PulsoAudio = (() => {
       }
     } else {
       // ── bar 2 old way (pre-rendered, tape-stopped at the freeze)
+      if (!win || (win[0] <= 1.875 && win[1] > 1.875)) {
       const oldBuf = await renderOld(ev, mood, seed, k);
       const os = ctx.createBufferSource(); os.buffer = oldBuf; const og = ctx.createGain(); og.gain.value = M ? 0.9 : 0.55; os.connect(og).connect(master);
       os.playbackRate.setValueAtTime(1, 3.75); os.playbackRate.exponentialRampToValueAtTime(0.03, 4.07);
       og.gain.setValueAtTime(M ? 0.9 : 0.55, 3.75); og.gain.linearRampToValueAtTime(0, 4.07);
       os.start(1.875); os.stop(4.1);
+      }
     }
     // ── bar 3 build
     if (M) {
@@ -351,9 +401,12 @@ const PulsoAudio = (() => {
     I.riser(S, 14.72, 0.28, 800, 7000, 0.15, false);
     }
 
-    const buf = await ctx.startRendering();
-    // wrap the tail past 15 s back to the start (seamless loop), soft-clip, normalise
-    const n15 = Math.floor(SR * T15 * k), out = new AudioBuffer({ length: n15, numberOfChannels: 2, sampleRate: SR });
+    return ctx.startRendering();
+  }
+
+  // emenda do loop (o que passa do fim volta para o começo), saturação suave e volume final (~-13 dB RMS)
+  function master(buf, n15) {
+    const out = new AudioBuffer({ length: n15, numberOfChannels: 2, sampleRate: SR });
     let peak = 0;
     const chans = [0, 1].map((c) => { const src = buf.getChannelData(c), d = new Float32Array(n15); d.set(src.subarray(0, n15)); for (let i = n15; i < src.length; i++) d[i - n15] += src[i]; for (let i = 0; i < n15; i++) peak = Math.max(peak, Math.abs(d[i])); return d; });
     const pre = peak > 0 ? 0.95 / peak : 1, drive = 1.2, norm = Math.tanh(drive);
@@ -364,6 +417,118 @@ const PulsoAudio = (() => {
     const fade = Math.floor(SR * 0.003);
     chans.forEach((d, c) => { for (let i = 0; i < n15; i++) d[i] *= post; for (let i = 0; i < fade; i++) { d[i] *= i / fade; d[n15 - 1 - i] *= i / fade; } out.copyToChannel(d, c); });
     return out;
+  }
+
+  // ══════ vídeo de 30 s
+  // A partitura de 15 s é cortada em compassos (7,5 s e 11,25 s, onde o vídeo também corta) e os capítulos novos ganham
+  // música própria na mesma harmonia. O ritmo muda com a história: groove cheio nas fotos e no passo a passo, a batida
+  // recua no depoimento (só acorde e dedilhado), volta na frase final e sobe antes do contato.
+  async function render30(ev, opts = {}) {
+    const mood = opts.mood || ev.mood || 'energia', seed = opts.seed || 7;
+    // cada trecho monta o próprio grafo (com reverb) na thread principal: um de cada vez, com uma pausa entre eles,
+    // para a prévia não travar enquanto a trilha é preparada; a renderização em si corre em paralelo
+    const breathe = () => new Promise((r) => setTimeout(r, 0));
+    const makers = [() => score(ev, { mood, seed, window: [0, 7.5] }), () => chapters(ev, { mood, seed, part: 1 }), () => score(ev, { mood, seed, window: [7.5, 11.25] }),
+      () => chapters(ev, { mood, seed, part: 2 }), () => score(ev, { mood, seed, window: [11.25, 15] })];
+    const jobs = [];
+    for (const make of makers) { jobs.push(make()); await breathe(); }
+    const [s1, c1, s2, c2, s3] = await Promise.all(jobs);
+    const n = Math.floor(SR * 30), total = n + SR * 4, L = new Float32Array(total), R = new Float32Array(total);
+    const place = (buf, at) => { const o = Math.round(at * SR); [L, R].forEach((dst, c) => { const d = buf.getChannelData(c), m = Math.min(d.length, total - o); for (let i = 0; i < m; i++) dst[o + i] += d[i]; }); };
+    for (const [buf, at] of [[s1, 0], [c1, 7.5], [s2, 15], [c2, 18.75], [s3, 26.25]]) { place(buf, at); await breathe(); }
+    const mix = new AudioBuffer({ length: total, numberOfChannels: 2, sampleRate: SR }); mix.copyToChannel(L, 0); mix.copyToChannel(R, 1);
+    return master(mix, n);
+  }
+
+  async function chapters(ev, { mood, seed, part }) {
+    const ctx = new OfflineAudioContext(2, Math.ceil(SR * (7.5 + 3.2)), SR), K = makeKit(ctx, seed + 40 + part), I = instruments(ctx, K);
+    const B = buses(ctx, K, mood), { drums, music, sfx, both } = B;
+    const M = mood !== 'nenhuma', soft = mood === 'suave', PREMI = ev.style === 'premium', E = ev.ch30 || {};
+    const kicks = [];
+    // continua o ciclo de acordes do vídeo de 15 s (F C G Am / Fmaj7 Em7 Dm7 Cmaj7) sem quebrar a harmonia nos cortes
+    const prog = soft ? (part === 1 ? ['Em7', 'Dm7', 'Cmaj7', 'Fmaj7'] : ['Cmaj7', 'Fmaj7', 'Em7', 'Dm7']) : (part === 1 ? ['C', 'G', 'Am', 'F'] : ['Am', 'F', 'C', 'G']);
+    if (M) prog.forEach((ch, bi) => {
+      const b0 = bi * 4, calm = part === 2 && bi < 2; // depoimento: a batida recua
+      for (let b = 0; b < 4; b++) {
+        const tt = bt(b0 + b);
+        if (calm) { I.hat(drums, tt + BEAT / 2, 0.1, 0.05, b % 2 ? -0.2 : 0.2, 6500); continue; }
+        if (!soft || b % 2 === 0) kicks.push(tt);
+        if (!soft) {
+          if (b === 1 || b === 3) I.clap(both(drums, 0.18), tt, 0.5);
+          I.hat(drums, tt + BEAT / 2, 0.42, b % 2 ? 0.05 : 0.03, 0.25); I.hat(drums, tt + BEAT / 4, 0.2, 0.02, -0.3); I.hat(drums, tt + (3 * BEAT) / 4, 0.22, 0.02, -0.25);
+        } else {
+          if (b === 1 || b === 3) I.noiseBurst(both(drums, 0.25), tt, 0.2, 'bandpass', 3200, 1.4, 0.35, 0.03);
+          I.hat(drums, tt + BEAT / 2, 0.22, 0.06, 0.2, 5500); I.hat(drums, tt + BEAT / 4, 0.1, 0.05, -0.3, 5500);
+        }
+      }
+      const root = ROOT[ch], notes = CH[ch].map((m) => m + 12);
+      if (calm) {
+        // acorde longo que abre devagar, dedilhado em colcheias e um grave sustentado
+        const p = I.pad(both(music, 0.45), bt(b0), CH[ch], BAR, soft ? 0.2 : 0.24, 900, 0.5, 0.5, 9);
+        p.f.frequency.setValueAtTime(900, bt(b0)); p.f.frequency.exponentialRampToValueAtTime(1800, bt(b0) + BAR);
+        const pat = [0, 2, 1, 3, 2, 1, 3, 2];
+        for (let e = 0; e < 8; e++) I.pluck(both(music, 0.35, 0.3), bt(b0) + (e * BEAT) / 2, mtof(notes[pat[e] % notes.length]), 0.45, 0.06, 1400, e % 2 ? -0.3 : 0.3, 'soft');
+        const o = ctx.createOscillator(); o.frequency.value = mtof(root); const gg = ctx.createGain(); gg.gain.setValueAtTime(0, bt(b0)); gg.gain.linearRampToValueAtTime(0.22, bt(b0) + 0.3); gg.gain.setTargetAtTime(0, bt(b0) + BAR - 0.1, 0.05);
+        o.connect(gg).connect(music); o.start(bt(b0)); o.stop(bt(b0) + BAR + 0.3);
+        return;
+      }
+      if (!soft) {
+        for (let e = 0; e < 8; e++) {
+          const tt = bt(b0) + (e * BEAT) / 2, f = mtof(root + (e % 4 === 3 ? 12 : 0)), len = BEAT / 2;
+          const sub = ctx.createOscillator(); sub.frequency.value = f; const sg = ctx.createGain(); sg.gain.setValueAtTime(0, tt); sg.gain.linearRampToValueAtTime(0.5, tt + 0.004); sg.gain.setTargetAtTime(0.4, tt + 0.004, 0.2); sg.gain.setTargetAtTime(0, tt + len - 0.03, 0.015);
+          const gr = ctx.createOscillator(); gr.type = 'sawtooth'; gr.frequency.value = f * 2; const gl = ctx.createBiquadFilter(); gl.type = 'lowpass'; gl.frequency.value = 900; const gg = ctx.createGain(); gg.gain.setValueAtTime(0, tt); gg.gain.linearRampToValueAtTime(0.12, tt + 0.003); gg.gain.setTargetAtTime(0.04, tt + 0.003, 0.06); gg.gain.setTargetAtTime(0, tt + len - 0.03, 0.015);
+          sub.connect(sg).connect(music); gr.connect(gl).connect(gg).connect(music); [sub, gr].forEach((o) => { o.start(tt); o.stop(tt + len + 0.1); });
+        }
+        const pat = [0, 1, 2, 3, 2, 1, 3, 2, 0, 2, 1, 3, 2, 3, 1, 2];
+        for (let k = 0; k < 16; k++) I.pluck(both(music, 0.12, 0.35), bt(b0) + (k * BEAT) / 4, mtof(notes[pat[k] % notes.length] + (k === 6 || k === 14 ? 12 : 0)), 0.22, 0.1, 3600, k % 2 ? -0.35 : 0.35);
+        I.pad(both(music, 0.25), bt(b0), CH[ch], BAR, 0.2, 2200, 0.08, 0.25, 12);
+      } else {
+        for (let h = 0; h < 2; h++) { const tt = bt(b0) + h * 2 * BEAT; const o = ctx.createOscillator(); o.frequency.value = mtof(root + (h ? 7 : 0)); const gg = ctx.createGain(); gg.gain.setValueAtTime(0, tt); gg.gain.linearRampToValueAtTime(0.42, tt + 0.02); gg.gain.setTargetAtTime(0.2, tt + 0.02, 0.4); gg.gain.setTargetAtTime(0, tt + 2 * BEAT - 0.05, 0.03); o.connect(gg).connect(music); o.start(tt); o.stop(tt + 2 * BEAT + 0.2); }
+        const pat = [0, 2, 1, 3, 2, 1, 3, 0];
+        for (let k = 0; k < 8; k++) I.pluck(both(music, 0.3, 0.3), bt(b0) + (k * BEAT) / 2, mtof(notes[pat[k] % notes.length]), 0.5, 0.09, 1600, k % 2 ? -0.3 : 0.3, 'soft');
+        I.pad(both(music, 0.35), bt(b0), CH[ch], BAR, 0.16, 1400, 0.3, 0.4, 8);
+      }
+    });
+    if (M && part === 2) {
+      // a frase final cai no tempo 1 do 3º compasso (a volta da batida) e o último compasso sobe para o contato
+      I.kick(drums, bt(8), soft ? 0.8 : 1.1, 0.45);
+      if (!soft && !PREMI) for (let k = 0; k < 12; k++) I.snare(both(drums, 0.1), bt(14) + (k * 2 * BEAT) / 12, 0.1 + 0.03 * k, 0.05);
+      I.riser(both(sfx, 0.12), bt(16) - 0.95, 0.9, 280, 7000, PREMI ? 0.12 : soft ? 0.18 : 0.28, !soft && !PREMI);
+    }
+    kicks.forEach((k) => I.kick(drums, k, soft ? 0.55 : 0.95, soft ? 0.24 : 0.32, soft ? 1800 : 0));
+    if (M) {
+      music.gain.setValueAtTime(1, 0);
+      kicks.slice().sort((a, b) => a - b).forEach((k) => { music.gain.setValueAtTime(1, k); music.gain.setValueAtTime(soft ? 0.7 : 0.38, k + 0.002); music.gain.setTargetAtTime(1, k + 0.004, 0.09); });
+    }
+
+    // ── efeitos: um som por acontecimento que importa; no Premium, curtos e baixos
+    const S = both(sfx), SR_ = (v) => both(sfx, v), q = PREMI ? 0.5 : 1;
+    const whoosh = (t, vert) => (PREMI ? I.whoosh(SR_(0.1), t - 0.06, 0.52, 250, 2200, 400, 0.17, vert ? 0 : 0.7, vert ? 0 : -0.7, 0.45) : I.whoosh(SR_(0.08), t, 0.46, 250, vert ? 2600 : 3200, 400, 0.55, vert ? 0 : 0.8, vert ? 0 : -0.8, 0.47));
+    if (part === 1) {
+      const sh = E.show || {}, st = E.steps || {}, off = BAR * 2;
+      (sh.lands || []).filter((_, i, a) => i < 10 || i === a.length - 1).forEach((t, i) => I.click(S, t, (PREMI ? 0.12 : 0.22) * (i ? 1 : 1.3), 2600 + (i % 5) * 300, PREMI ? 0.6 : 0.9, 150 + (i % 4) * 25, ((i % 5) - 2) * 0.2));
+      if (sh.tap != null) { I.click(S, sh.tap, 0.34 * (PREMI ? 0.9 : 1), 2300, 1.1, 150); [96, 100, 103].forEach((m, i) => I.bell(SR_(0.45), sh.tap + 0.05 + i * 0.05, mtof(m), 0.7, 0.035 * q + 0.01, (i - 1) * 0.4)); }
+      if (sh.tap2 != null) { I.click(S, sh.tap2, 0.3 * (PREMI ? 0.9 : 1), 2400, 1.0, 160); I.bell(SR_(0.4), sh.tap2 + 0.05, mtof(98), 0.6, 0.03 * q + 0.01, 0.2); }
+      if (sh.fan != null) { I.whoosh(SR_(0.12), sh.fan - 0.1, 0.4, 300, 1800, 500, 0.14 * q + 0.04, -0.4, 0.4, 0.6); [0, 1].forEach((i) => I.pop(S, sh.fan + 0.12 + i * 0.07, 0.16 * q, 700 + i * 120, 330 + i * 40, 0.07, i ? 0.3 : -0.3)); }
+      whoosh(BAR * 2 - 0.22, false);
+      (st.t || []).forEach((nt, i) => { const m = [72, 76, 79][i] + 12; I.pluck(both(sfx, 0.25, 0.25), off + nt, mtof(m), 0.25, PREMI ? 0.08 : 0.14, 4600, -0.2 + i * 0.2, PREMI ? 'soft' : 'saw'); I.tone(S, off + nt, mtof(m), 0.4, PREMI ? 0.03 : 0.05, 0.11); });
+      if (st.confirm != null) [84, 88, 91].forEach((m, i) => I.bell(SR_(0.4), off + st.confirm + i * 0.1, mtof(m + 12), 0.6, 0.03 * q + 0.015, (i - 1) * 0.3));
+      whoosh(BAR * 4 - 0.22, false);
+    } else {
+      const v = E.voice || {}, pu = E.punch || {}, off = BAR * 2;
+      if (v.kind === 'quote') { I.impact(SR_(0.15), 0.05, PREMI ? 0.2 : 0.3, 90, 50, 0.3); if (v.author != null) I.pop(S, v.author + 0.05, 0.16 * q + 0.04, 650, 320, 0.07); }
+      else if (v.kind === 'offer') { I.impact(SR_(0.15), bt(1), PREMI ? 0.22 : 0.4, 110, 60, 0.25); I.pop(S, bt(1), PREMI ? 0.2 : 0.35, 900, 400, 0.08); I.pop(S, bt(4), 0.18 * q + 0.04, 700, 350, 0.07); }
+      else { [84, 88].forEach((m, i) => I.bell(SR_(0.4), 0.1 + i * 0.08, mtof(m + 12), 0.8, 0.04 * q + 0.015, (i - 0.5) * 0.4)); for (let i = 0; i < (v.n || 0); i++) I.pop(S, bt(5) + i * 0.08, 0.14 * q + 0.04, 640 + i * 90, 300 + i * 40, 0.06, (i - 1) * 0.3); }
+      whoosh(BAR * 2 - 0.22, true);
+      (pu.words || []).forEach((wt, i, a) => {
+        const t = off + wt + 0.11, last = i === a.length - 1;
+        if (PREMI) I.click(S, t, last ? 0.28 : 0.14, 2200 + (i % 3) * 300, last ? 1.1 : 0.7, 150);
+        else { I.impact(SR_(0.12), t, last ? 0.7 : 0.28, last ? 70 : 90, last ? 34 : 48, last ? 0.8 : 0.25); I.noiseBurst(SR_(0.2), t, 0.2, 'highpass', 4000, 0.7, last ? 0.2 : 0.1, 0.04); }
+      });
+      if (pu.last != null) [2637, 3136, 3520].forEach((f, i) => I.tone(SR_(0.6), off + pu.last + 0.45 + i * 0.03, f, 1.2, 0.02 * q + 0.008, 0.5, (i - 1) * 0.3));
+      whoosh(BAR * 4 - 0.22, true);
+    }
+    return ctx.startRendering();
   }
 
   // 16-bit WAV (for debugging / tests)

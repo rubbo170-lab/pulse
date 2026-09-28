@@ -4,9 +4,11 @@
   const $ = (id) => document.getElementById(id);
   const SEGMENTS = ['Confeitaria', 'Restaurante', 'Pizzaria', 'Lanchonete', 'Cafeteria', 'Moda', 'Beleza', 'Saúde', 'Odontologia', 'Fitness', 'Educação', 'Pet', 'Imobiliária', 'Serviços', 'Tecnologia', 'Loja', 'Outro'];
   const ICON_LABELS = { check: 'Visto', clock: 'Relógio', truck: 'Entrega', chat: 'Conversa', star: 'Estrela', heart: 'Coração', shield: 'Escudo', bolt: 'Raio', tag: 'Etiqueta', gift: 'Presente', leaf: 'Folha', pin: 'Local', phone: 'Celular', card: 'Cartão', calendar: 'Agenda', people: 'Pessoas', sparkle: 'Brilho', flame: 'Fogo', home: 'Casa', cart: 'Carrinho', globe: 'Internet', percent: 'Desconto', trophy: 'Troféu', smile: 'Sorriso', tool: 'Ferramenta', bag: 'Sacola', paw: 'Patinha', book: 'Livro', dumbbell: 'Treino', scissors: 'Tesoura', coffee: 'Café' };
-  const SCENES = ['Gancho', 'Problema', 'Busca', 'Revelação', 'Vantagens', 'Prova', 'Contato', 'Marca'];
+  const SCENE_LABEL = { hook: 'Gancho', pain: 'Problema', search: 'Busca', reveal: 'Revelação', benefits: 'Vantagens', proof: 'Prova', offer: 'Oferta', statement: 'Frase',
+    showcase: 'Em detalhes', steps: 'Como funciona', quote: 'Depoimento', spot: 'Destaque', punch: 'Frase final', contact: 'Contato', logo: 'Marca' };
   const TEXT_IDS = ['f_name', 'f_segment', 'f_sells', 'f_diffs', 'f_offer', 'f_whats', 'f_insta', 'f_site', 'f_addr', 'f_rating', 'f_ratingSrc', 'f_customers', 'f_customersLabel', 'f_c1', 'f_c2',
-    'f_hook1', 'f_hook2', 'f_pain', 'f_search', 'f_product', 'f_benTitle', 'f_b1', 'f_i1', 'f_b2', 'f_i2', 'f_b3', 'f_i3', 'f_b4', 'f_i4', 'f_tagline', 'f_cta'];
+    'f_hook1', 'f_hook2', 'f_pain', 'f_search', 'f_product', 'f_benTitle', 'f_b1', 'f_i1', 'f_b2', 'f_i2', 'f_b3', 'f_i3', 'f_b4', 'f_i4', 'f_tagline', 'f_cta',
+    'f_showTitle', 'f_stepsTitle', 'f_s1', 'f_si1', 'f_s2', 'f_si2', 'f_s3', 'f_si3', 'f_quote', 'f_author'];
 
   // empresa fictícia de exemplo, uma por idioma
   const EXAMPLES = {
@@ -16,6 +18,7 @@
       f_rating: '4,9', f_ratingSrc: 'Google', f_customers: '+1.200', f_customersLabel: 'clientes felizes',
       f_hook1: 'BOLO', f_hook2: 'DE VERDADE', f_pain: 'Cansou de doce sem sabor?', f_search: 'confeitaria artesanal perto de mim', f_product: 'Bolo de pote de ninho', f_benTitle: 'Por que a Doce Aurora?',
       f_b1: 'Feito no mesmo dia', f_i1: 'clock', f_b2: 'Entrega no bairro', f_i2: 'truck', f_b3: 'Peça pelo WhatsApp', f_i3: 'chat', f_b4: '', f_i4: 'star', f_tagline: 'Doce de verdade, do jeito certo.', f_cta: 'Peça pelo WhatsApp',
+      f_showTitle: 'Nossos doces', f_stepsTitle: 'Como pedir', f_s1: 'Escolha o sabor', f_si1: 'heart', f_s2: 'Peça pelo WhatsApp', f_si2: 'chat', f_s3: 'Receba no bairro', f_si3: 'truck', f_quote: 'Melhor bolo de pote que já comi!', f_author: 'Ana, cliente',
     },
     en: {
       f_name: 'Golden Crumb', f_segment: 'Confeitaria', f_sells: 'Cupcakes, celebration cakes and pastries made to order, delivered downtown.',
@@ -23,6 +26,7 @@
       f_rating: '4.9', f_ratingSrc: 'Google', f_customers: '+1,200', f_customersLabel: 'happy customers',
       f_hook1: 'CAKE', f_hook2: 'DONE RIGHT', f_pain: 'Tired of bland desserts?', f_search: 'bakery near me', f_product: 'Vanilla bean cupcake', f_benTitle: 'Why Golden Crumb?',
       f_b1: 'Baked the same day', f_i1: 'clock', f_b2: 'Local delivery', f_i2: 'truck', f_b3: 'Order on WhatsApp', f_i3: 'chat', f_b4: '', f_i4: 'star', f_tagline: 'Sweet, fresh and done right.', f_cta: 'Order on WhatsApp',
+      f_showTitle: 'Our treats', f_stepsTitle: 'How to order', f_s1: 'Pick your flavor', f_si1: 'heart', f_s2: 'Order on WhatsApp', f_si2: 'chat', f_s3: 'Get it delivered', f_si3: 'truck', f_quote: 'Best cupcakes in town!', f_author: 'Emma, customer',
     },
     es: {
       f_name: 'Dulce Aurora', f_segment: 'Confeitaria', f_sells: 'Pasteles, cupcakes y postres por encargo, con entrega en el centro.',
@@ -30,11 +34,13 @@
       f_rating: '4.9', f_ratingSrc: 'Google', f_customers: '+1,200', f_customersLabel: 'clientes felices',
       f_hook1: 'PASTEL', f_hook2: 'DE VERDAD', f_pain: '¿Cansado de postres sin sabor?', f_search: 'pastelería cerca de mí', f_product: 'Pastel de tres leches', f_benTitle: '¿Por qué Dulce Aurora?',
       f_b1: 'Hecho el mismo día', f_i1: 'clock', f_b2: 'Entrega a domicilio', f_i2: 'truck', f_b3: 'Pide por WhatsApp', f_i3: 'chat', f_b4: '', f_i4: 'star', f_tagline: 'Dulce de verdad, bien hecho.', f_cta: 'Pide por WhatsApp',
+      f_showTitle: 'Nuestros postres', f_stepsTitle: 'Cómo pedir', f_s1: 'Elige tu sabor', f_si1: 'heart', f_s2: 'Pide por WhatsApp', f_si2: 'chat', f_s3: 'Recíbelo en casa', f_si3: 'truck', f_quote: '¡El mejor pastel que he probado!', f_author: 'Lucía, clienta',
     },
   };
   const EXAMPLE = { ...EXAMPLES[LANG] || EXAMPLES.pt, f_c1: '#ff5c8a', f_c2: '#ffc46b', style: 'moderno', mood: 'energia', motion: 'dinamico', dur: '15' };
-  const EX_BIZ = ['f_sells', 'f_diffs', 'f_offer', 'f_whats', 'f_insta', 'f_site', 'f_addr', 'f_rating', 'f_ratingSrc', 'f_customers', 'f_customersLabel'];
-  const EMPTY = { ...Object.fromEntries(TEXT_IDS.map((k) => [k, ''])), f_segment: 'Outro', f_c1: '#7c5cff', f_c2: '#ffb547', f_i1: 'check', f_i2: 'clock', f_i3: 'chat', f_i4: 'star', style: 'moderno', mood: 'energia', motion: 'dinamico', dur: '15' };
+  const EX_BIZ = ['f_sells', 'f_diffs', 'f_offer', 'f_whats', 'f_insta', 'f_site', 'f_addr', 'f_rating', 'f_ratingSrc', 'f_customers', 'f_customersLabel', 'f_quote', 'f_author'];
+  const EMPTY = { ...Object.fromEntries(TEXT_IDS.map((k) => [k, ''])), f_segment: 'Outro', f_c1: '#7c5cff', f_c2: '#ffb547', f_i1: 'check', f_i2: 'clock', f_i3: 'chat', f_i4: 'star', f_si1: 'bag', f_si2: 'chat', f_si3: 'heart', style: 'moderno', mood: 'energia', motion: 'dinamico', dur: '15' };
+  const durOf = (v) => (Number(v) === 20 ? 20 : Number(v) === 30 ? 30 : 15);
 
   // roteiro automático por segmento (sem IA), em cada idioma
   const SEGS = {
@@ -103,11 +109,34 @@
     es: { split: /\.|;|\n| para /i, conj: /,| y /, stop: /\s+(y|o|de|del|la|el|los|las|con|para|por|en|un|una|al)$/i, near: ' cerca de mí', why: '¿Por qué elegirnos?', verbs: /^(Pide|Agenda|Reserva)$/, via: ' por WhatsApp', whats: 'Escríbenos por WhatsApp', follow: 'Síguenos: ', bens: ['Atención cercana', 'Hecho con cuidado'], wBen: 'Escríbenos por WhatsApp', iBen: 'Síguenos en Instagram', oBen: 'Escríbenos' },
   };
   const WORDS = WORDS_ALL[LANG] || WORDS_ALL.pt;
+  // vídeo de 30 s: título das fotos e "como funciona" em 3 passos, por tipo de negócio (comida, agendamento, loja, serviço)
+  const KIND = { Confeitaria: 'food', Restaurante: 'food', Pizzaria: 'food', Lanchonete: 'food', Cafeteria: 'food', Beleza: 'book', 'Saúde': 'book', Odontologia: 'book', Fitness: 'book', 'Educação': 'book', Pet: 'book', Moda: 'shop', Loja: 'shop', 'Serviços': 'serv', 'Imobiliária': 'serv', Tecnologia: 'serv', Outro: 'serv' };
+  const STEPS_ALL = {
+    pt: {
+      food: { show: 'Nosso cardápio', title: 'Como pedir', s: [['Escolha no cardápio', 'bag'], [{ w: 'Peça pelo WhatsApp', i: 'Chame no Instagram', s: 'Peça pelo site', o: 'Fale com a gente' }, 'chat'], ['Receba em casa', 'truck']] },
+      book: { show: 'Nosso espaço', title: 'Como agendar', s: [['Escolha o serviço', 'calendar'], [{ w: 'Agende pelo WhatsApp', i: 'Chame no Instagram', s: 'Agende pelo site', o: 'Fale com a gente' }, 'chat'], ['Venha no horário', 'clock']] },
+      shop: { show: 'Nossos produtos', title: 'Como comprar', s: [['Escolha seu produto', 'bag'], [{ w: 'Chame no WhatsApp', i: 'Chame no Instagram', s: 'Compre pelo site', o: 'Fale com a gente' }, 'chat'], ['Receba em casa', 'truck']] },
+      serv: { show: 'Veja de perto', title: 'Como funciona', s: [['Conte o que precisa', 'chat'], [{ w: 'Receba o orçamento', i: 'Receba o orçamento', s: 'Receba o orçamento', o: 'Receba o orçamento' }, 'tag'], ['Pronto, resolvido', 'check']] },
+    },
+    en: {
+      food: { show: 'Our menu', title: 'How to order', s: [['Pick from the menu', 'bag'], [{ w: 'Order on WhatsApp', i: 'DM us on Instagram', s: 'Order on our site', o: 'Get in touch' }, 'chat'], ['Enjoy it at home', 'truck']] },
+      book: { show: 'Our place', title: 'How to book', s: [['Choose a service', 'calendar'], [{ w: 'Book on WhatsApp', i: 'DM us on Instagram', s: 'Book on our site', o: 'Get in touch' }, 'chat'], ['Come in on time', 'clock']] },
+      shop: { show: 'Our products', title: 'How to buy', s: [['Pick your product', 'bag'], [{ w: 'Message us on WhatsApp', i: 'DM us on Instagram', s: 'Buy on our site', o: 'Get in touch' }, 'chat'], ['Get it delivered', 'truck']] },
+      serv: { show: 'Take a closer look', title: 'How it works', s: [['Tell us what you need', 'chat'], [{ w: 'Get your quote', i: 'Get your quote', s: 'Get your quote', o: 'Get your quote' }, 'tag'], ['Done, problem solved', 'check']] },
+    },
+    es: {
+      food: { show: 'Nuestro menú', title: 'Cómo pedir', s: [['Elige del menú', 'bag'], [{ w: 'Pide por WhatsApp', i: 'Escríbenos en Instagram', s: 'Pide en nuestro sitio', o: 'Escríbenos' }, 'chat'], ['Recíbelo en casa', 'truck']] },
+      book: { show: 'Nuestro espacio', title: 'Cómo agendar', s: [['Elige el servicio', 'calendar'], [{ w: 'Agenda por WhatsApp', i: 'Escríbenos en Instagram', s: 'Agenda en el sitio', o: 'Escríbenos' }, 'chat'], ['Ven a tu hora', 'clock']] },
+      shop: { show: 'Nuestros productos', title: 'Cómo comprar', s: [['Elige tu producto', 'bag'], [{ w: 'Escríbenos por WhatsApp', i: 'Escríbenos en Instagram', s: 'Compra en el sitio', o: 'Escríbenos' }, 'chat'], ['Recíbelo en casa', 'truck']] },
+      serv: { show: 'Míralo de cerca', title: 'Cómo funciona', s: [['Cuéntanos qué necesitas', 'chat'], [{ w: 'Recibe tu presupuesto', i: 'Recibe tu presupuesto', s: 'Recibe tu presupuesto', o: 'Recibe tu presupuesto' }, 'tag'], ['Listo, resuelto', 'check']] },
+    },
+  };
+  const STEPS = STEPS_ALL[LANG] || STEPS_ALL.pt;
 
   const DRAFT_KEY = `pulso.draft.v3.${LANG}`;
-  const state = { engine: null, images: { logo: null, product: null }, audio: null, audioKey: '', audioReady: false, playing: true, t: 0, lastNow: null, dirty: true, soundOn: false, actx: null, src: null, startAt: 0, scale: 0.5, ft: [], revise: null, busy: false, aiEnabled: true, dur: 15 };
+  const state = { engine: null, images: { logo: null, product: null }, gallery: [null, null, null], audio: null, audioKey: '', audioReady: false, playing: true, t: 0, lastNow: null, dirty: true, soundOn: false, actx: null, src: null, startAt: 0, scale: 0.5, ft: [], revise: null, busy: false, aiEnabled: true, dur: 15 };
   const pv = $('pv');
-  const K = () => state.dur / 15; // 20 s = mesma animação 4/3 mais lenta
+  const K = () => (state.dur === 20 ? 20 / 15 : 1); // 20 s = mesma animação 4/3 mais lenta; 30 s tem cenas próprias
 
   // ── formulário
   function readForm() {
@@ -123,17 +152,19 @@
     TEXT_IDS.forEach((k) => { if (f[k] != null) $(k).value = f[k]; });
     for (const n of ['style', 'mood', 'motion', 'dur']) { const el = document.querySelector(`input[name=${n}][value="${f[n]}"]`); if (el) el.checked = true; }
     updateCounters(); $('c1v').textContent = $('f_c1').value.toUpperCase(); $('c2v').textContent = $('f_c2').value.toUpperCase();
-    setDuration(Number(f.dur) === 20 ? 20 : 15);
+    setDuration(durOf(f.dur));
   }
   function toSpec(f) {
     const benefits = [1, 2, 3, 4].map((i) => ({ text: f['f_b' + i].trim(), icon: f['f_i' + i] })).filter((b) => b.text);
+    const steps = [1, 2, 3].map((i) => ({ text: f['f_s' + i].trim(), icon: f['f_si' + i] })).filter((b) => b.text);
     return {
-      lang: LANG, duration: Number(f.dur) === 20 ? 20 : 15,
+      lang: LANG, duration: durOf(f.dur),
       brand: { name: f.f_name.trim(), segment: f.f_segment },
       colors: { primary: f.f_c1, secondary: f.f_c2 },
       style: { font: f.style, mood: f.mood, motion: f.motion === 'premium' ? 'premium' : 'dinamico', watermark: false },
-      script: { hook: [f.f_hook1, f.f_hook2].map((s) => s.trim()).filter(Boolean), pain: f.f_pain.trim(), search: f.f_search.trim(), product: f.f_product.trim(), offer: f.f_offer.trim(), benefitsTitle: f.f_benTitle.trim(), benefits, tagline: f.f_tagline.trim(), cta: f.f_cta.trim() },
-      proof: { rating: f.f_rating.trim(), ratingSource: f.f_ratingSrc.trim(), customers: f.f_customers.trim(), customersLabel: f.f_customersLabel.trim() },
+      script: { hook: [f.f_hook1, f.f_hook2].map((s) => s.trim()).filter(Boolean), pain: f.f_pain.trim(), search: f.f_search.trim(), product: f.f_product.trim(), offer: f.f_offer.trim(), benefitsTitle: f.f_benTitle.trim(), benefits, tagline: f.f_tagline.trim(), cta: f.f_cta.trim(),
+        showcaseTitle: f.f_showTitle.trim(), stepsTitle: f.f_stepsTitle.trim(), steps },
+      proof: { rating: f.f_rating.trim(), ratingSource: f.f_ratingSrc.trim(), customers: f.f_customers.trim(), customersLabel: f.f_customersLabel.trim(), quote: f.f_quote.replace(/\s+/g, ' ').trim(), author: f.f_author.trim() },
       contact: { whatsapp: f.f_whats.trim(), instagram: f.f_insta.trim(), site: f.f_site.trim(), address: f.f_addr.trim() },
     };
   }
@@ -142,7 +173,10 @@
     f.f_name = s.brand.name; f.f_segment = s.brand.segment; f.f_c1 = s.colors.primary; f.f_c2 = s.colors.secondary; f.style = s.style.font; f.mood = s.style.mood; f.motion = s.style.motion || 'dinamico'; f.dur = String(s.duration || 15);
     const sc = s.script; f.f_hook1 = sc.hook[0] || ''; f.f_hook2 = sc.hook[1] || ''; f.f_pain = sc.pain; f.f_search = sc.search; f.f_product = sc.product; f.f_offer = sc.offer; f.f_benTitle = sc.benefitsTitle; f.f_tagline = sc.tagline; f.f_cta = sc.cta;
     [1, 2, 3, 4].forEach((i) => { const b = sc.benefits[i - 1]; f['f_b' + i] = b ? b.text : ''; if (b) f['f_i' + i] = b.icon; });
+    f.f_showTitle = sc.showcaseTitle || ''; f.f_stepsTitle = sc.stepsTitle || '';
+    [1, 2, 3].forEach((i) => { const b = (sc.steps || [])[i - 1]; f['f_s' + i] = b ? b.text : ''; if (b) f['f_si' + i] = b.icon; });
     f.f_rating = s.proof.rating; f.f_ratingSrc = s.proof.ratingSource; f.f_customers = s.proof.customers; f.f_customersLabel = s.proof.customersLabel;
+    f.f_quote = s.proof.quote || ''; f.f_author = s.proof.author || '';
     f.f_whats = s.contact.whatsapp; f.f_insta = s.contact.instagram; f.f_site = s.contact.site; f.f_addr = s.contact.address;
     return f;
   }
@@ -153,7 +187,7 @@
   function loadDraft() { try { const s = localStorage.getItem(DRAFT_KEY); return s ? JSON.parse(s) : null; } catch { return null; } }
   function setStatus(msg, cls, id = 'status') { const el = $(id); el.textContent = msg || ''; el.className = 'status' + (cls ? ' ' + cls : ''); }
 
-  // ── duração (15 ou 20 s) e preço
+  // ── duração (15, 20 ou 30 s) e preço
   function setDuration(d) {
     if (d === state.dur && state.durInit) return;
     const frac = state.t / state.dur;
@@ -162,6 +196,7 @@
     document.querySelectorAll('[data-price-now]').forEach((el) => { el.dataset.price = String(d); });
     Site.paintFooter();
     $('specPill').textContent = `${d} s · 1080×1920 · 60 fps`;
+    $('panel30').hidden = d !== 30;
     state.dirty = true;
     if (state.engine) scheduleAudio(true);
   }
@@ -173,13 +208,12 @@
     try {
       const spec = toSpec(readForm());
       if (!spec.brand.name) spec.brand.name = T('Sua Empresa');
-      state.engine = Pulso.create(spec, state.images); state.dirty = true;
-      const v = state.engine.events.variant; SCENES[5] = v === 'proof' ? 'Prova' : v === 'offer' ? 'Oferta' : 'Frase';
-      document.querySelectorAll('.seg small').forEach((el, i) => { el.textContent = T(SCENES[i]); });
+      state.engine = Pulso.create(spec, { ...state.images, gallery: state.gallery.filter(Boolean) }); state.dirty = true;
+      buildTimeline(); scheduleBoard();
       scheduleAudio();
     } catch (e) { console.error(e); setStatus(T('A prévia falhou ao montar. Revise os textos e tente de novo.'), 'err'); }
   }
-  function audioKey() { const e = state.engine.events; return JSON.stringify([e.mood, e.style, e.typeChars, e.variant, e.benefitsN, e.contactRows, e.hasOffer, state.dur]); }
+  function audioKey() { const e = state.engine.events; return JSON.stringify([e.mood, e.style, e.typeChars, e.variant, e.benefitsN, e.contactRows, e.hasOffer, state.dur, e.ch30]); }
   function scheduleAudio(force) { if (!state.engine) return; const k = audioKey(); if (!force && k === state.audioKey) return; state.audioReady = false; clearTimeout(audioTimer); audioTimer = setTimeout(() => renderAudio(k), 650); }
   async function renderAudio(k) {
     const v = ++audioVersion; soundLabel();
@@ -249,13 +283,41 @@
     }
     updateTransport();
   }
-  let lastScene = -1;
+  // linha do tempo: um trecho por cena, com a largura da duração dela (as cenas novas do vídeo de 30 s têm 2 compassos)
+  let lastScene = -1, tlKey = '';
+  const scenes = () => (state.engine && state.engine.scenes) || [];
+  function buildTimeline() {
+    const sc = scenes(), key = sc.map((x) => `${x.key}:${x.t0}`).join('|');
+    if (key === tlKey) return;
+    tlKey = key; lastScene = -1;
+    const tl = $('tl'); tl.querySelectorAll('.seg').forEach((el) => el.remove());
+    tl.style.gridTemplateColumns = sc.map((x) => `minmax(0, ${(x.t1 - x.t0).toFixed(3)}fr)`).join(' ');
+    sc.forEach((x) => { const d = document.createElement('div'); d.className = 'seg'; d.innerHTML = `<div class="bar"></div><small>${Site.esc(T(SCENE_LABEL[x.key] || x.key))}</small>`; tl.insertBefore(d, $('ph')); });
+  }
+  // storyboard: uma miniatura por cena, no instante em que ela está montada; toque para ir até a cena
+  let boardTimer = null;
+  function scheduleBoard() { clearTimeout(boardTimer); boardTimer = setTimeout(drawBoard, 450); }
+  function drawBoard() {
+    const E = state.engine, box = $('board'); if (!E) return;
+    const sc = scenes();
+    if (box.children.length !== sc.length) box.innerHTML = sc.map((x, i) => `<button class="shot" type="button" data-i="${i}"><canvas width="108" height="192"></canvas><small></small></button>`).join('');
+    sc.forEach((x, i) => {
+      const b = box.children[i]; b.dataset.t = String(x.thumb * K()); b.querySelector('small').textContent = T(SCENE_LABEL[x.key] || x.key); b.title = T(SCENE_LABEL[x.key] || x.key);
+      try { E.renderFrame(b.querySelector('canvas'), x.thumb, { samples: 1, fps: 60 * K(), post: false }); } catch (e) { /* miniatura opcional */ }
+    });
+  }
   function updateTransport() {
-    const t = state.t, D = state.dur, s = Math.min(7, Math.floor(t / (D / 8)));
+    const t = state.t, D = state.dur, te = t / K(), sc = scenes();
+    let s = sc.findIndex((x) => te >= x.t0 && te < x.t1); if (s < 0) s = sc.length - 1;
     $('tc').textContent = `${t.toFixed(2).padStart(5, '0')} / ${D.toFixed(2)}`;
     $('ph').style.left = `calc(${(t / D) * 100}% - 1px)`;
     $('tl').setAttribute('aria-valuenow', t.toFixed(1)); $('tl').setAttribute('aria-valuemax', String(D));
-    if (s !== lastScene) { lastScene = s; document.querySelectorAll('.seg').forEach((el, i) => el.classList.toggle('cur', i === s)); $('sceneName').innerHTML = Site.esc(T('Cena {n} de 8:', { n: s + 1 })) + ` <b>${Site.esc(T(SCENES[s]))}</b>`; }
+    if (s !== lastScene && sc[s]) {
+      lastScene = s;
+      document.querySelectorAll('.seg').forEach((el, i) => el.classList.toggle('cur', i === s));
+      [...$('board').children].forEach((el, i) => el.classList.toggle('cur', i === s));
+      $('sceneName').innerHTML = Site.esc(T('Cena {n} de {total}:', { n: s + 1, total: sc.length })) + ` <b>${Site.esc(T(SCENE_LABEL[sc[s].key] || sc[s].key))}</b>`;
+    }
   }
   function setPlaying(p) {
     state.playing = p;
@@ -281,17 +343,23 @@
     const verb = seg.cta.split(' ')[0];
     const insta = f.f_insta ? (f.f_insta.startsWith('@') ? f.f_insta : '@' + f.f_insta) : '';
     const cta = f.f_whats ? (WORDS.verbs.test(verb) ? verb + WORDS.via : WORDS.whats) : insta ? WORDS.follow + insta : seg.cta;
-    return { hook: [seg.hook[0], seg.hook[1] || cutT(name.toLocaleUpperCase(Site.LOC), 14)], pain: seg.pain, search: cutT(search, 32), product: cap(product), benefitsTitle: WORDS.why, benefits, tagline: seg.tag, cta: cut(cta, 24) };
+    const st = STEPS[KIND[f.f_segment] || 'serv'], ch = f.f_whats ? 'w' : f.f_insta ? 'i' : f.f_site ? 's' : 'o';
+    const steps = st.s.map(([txt, icon]) => ({ text: cut(typeof txt === 'string' ? txt : txt[ch], 24), icon }));
+    return { hook: [seg.hook[0], seg.hook[1] || cutT(name.toLocaleUpperCase(Site.LOC), 14)], pain: seg.pain, search: cutT(search, 32), product: cap(product), benefitsTitle: WORDS.why, benefits, tagline: seg.tag, cta: cut(cta, 24),
+      showcaseTitle: st.show, stepsTitle: st.title, steps };
   }
   function sanitize(o, f) {
     const fb = offline(f), hook = Array.isArray(o && o.hook) ? o.hook : fb.hook;
     const bens = (Array.isArray(o && o.benefits) ? o.benefits : fb.benefits).slice(0, 4).map((b, i) => { const text = cut(b && (b.text || b), 30); const ic = PU.ICON_LIST.includes(b && b.icon) ? b.icon : PU.iconFor(text, fb.benefits[i] ? fb.benefits[i].icon : 'check'); return { text, icon: ic }; }).filter((b) => b.text);
-    return { hook: [cut(hook[0] || fb.hook[0], 14), cut(hook[1] || '', 18)], pain: cut(o.pain || fb.pain, 40), search: cut((o.search || fb.search).toLocaleLowerCase(Site.LOC), 40), product: cut(o.product || fb.product, 40), benefitsTitle: cut(o.benefitsTitle || fb.benefitsTitle, 30), benefits: bens.length ? bens : fb.benefits, tagline: cut(o.tagline || fb.tagline, 44), cta: cut(o.cta || fb.cta, 24) };
+    const steps = (Array.isArray(o && o.steps) ? o.steps : []).slice(0, 3).map((b, i) => { const text = cut(b && (b.text || b), 24); return { text, icon: PU.ICON_LIST.includes(b && b.icon) ? b.icon : PU.iconFor(text, fb.steps[i] ? fb.steps[i].icon : 'check') }; }).filter((b) => b.text);
+    return { hook: [cut(hook[0] || fb.hook[0], 14), cut(hook[1] || '', 18)], pain: cut(o.pain || fb.pain, 40), search: cut((o.search || fb.search).toLocaleLowerCase(Site.LOC), 40), product: cut(o.product || fb.product, 40), benefitsTitle: cut(o.benefitsTitle || fb.benefitsTitle, 30), benefits: bens.length ? bens : fb.benefits, tagline: cut(o.tagline || fb.tagline, 44), cta: cut(o.cta || fb.cta, 24),
+      showcaseTitle: cut(o.showcaseTitle || fb.showcaseTitle, 26), stepsTitle: cut(o.stepsTitle || fb.stepsTitle, 26), steps: steps.length === 3 ? steps : fb.steps };
   }
   function applyScript(s) {
     $('f_hook1').value = s.hook[0] || ''; $('f_hook2').value = s.hook[1] || ''; $('f_pain').value = s.pain; $('f_search').value = s.search; $('f_product').value = s.product; $('f_benTitle').value = s.benefitsTitle;
     [1, 2, 3, 4].forEach((i) => { const b = s.benefits[i - 1]; $('f_b' + i).value = b ? b.text : ''; $('f_i' + i).value = b ? b.icon : $('f_i' + i).value; });
     $('f_tagline').value = s.tagline; $('f_cta').value = s.cta;
+    if (s.steps) { $('f_showTitle').value = s.showcaseTitle || ''; $('f_stepsTitle').value = s.stepsTitle || ''; [1, 2, 3].forEach((i) => { const b = s.steps[i - 1]; $('f_s' + i).value = b ? b.text : ''; if (b) $('f_si' + i).value = b.icon; }); }
     updateCounters(); saveDraft(); rebuild(); seek(0); setPlaying(true);
   }
   async function writeScript() {
@@ -350,10 +418,13 @@
     state.autoColors = [$('f_c1').value, $('f_c2').value];
     saveDraft(); rebuild();
   }
-  const UPL = { logo: ['f_logo', 't_logo', 'n_logo', 'x_logo', 'PNG ou JPG, opcional'], product: ['f_photo', 't_photo', 'n_photo', 'x_photo', 'Opcional. Foto vertical fica melhor'] };
+  const UPL = { logo: ['f_logo', 't_logo', 'n_logo', 'x_logo', 'PNG ou JPG, opcional'], product: ['f_photo', 't_photo', 'n_photo', 'x_photo', 'Opcional. Foto vertical fica melhor'],
+    g0: ['f_g0', 't_g0', 'n_g0', 'x_g0', 'A principal'], g1: ['f_g1', 't_g1', 'n_g1', 'x_g1', 'Opcional'], g2: ['f_g2', 't_g2', 'n_g2', 'x_g2', 'Opcional'] };
+  const galIndex = (key) => (/^g[0-2]$/.test(key) ? Number(key[1]) : -1);
   function showImage(key, canvas, url, name) {
-    const [inputId, thumbId, nameId, removeId] = UPL[key];
-    state.images[key] = canvas; $(thumbId).style.backgroundImage = url ? `url("${url}")` : ''; $(nameId).textContent = name; $(removeId).hidden = !!state.revise || !canvas; $(inputId).closest('.drop').classList.toggle('has', !!canvas);
+    const [inputId, thumbId, nameId, removeId] = UPL[key], gi = galIndex(key);
+    if (gi >= 0) state.gallery[gi] = canvas; else state.images[key] = canvas;
+    $(thumbId).style.backgroundImage = url ? `url("${url}")` : ''; $(nameId).textContent = name; $(removeId).hidden = !!state.revise || !canvas; $(inputId).closest('.drop').classList.toggle('has', !!canvas);
   }
   function bindUpload(key) {
     const [inputId, , , removeId, hint] = UPL[key];
@@ -377,8 +448,14 @@
   }
   // o que vai para o servidor: logo em PNG (mantém transparência), foto em JPEG — sempre abaixo do limite de 3 MB
   function imageData(key) {
-    const c = state.images[key];
+    const gi = galIndex(key), c = gi >= 0 ? state.gallery[gi] : state.images[key];
     if (!c) return null;
+    if (gi >= 0) {
+      // fotos extras: até 1400 px e abaixo de ~1,2 MB cada (vão três no mesmo envio)
+      let q = 0.86, out = c.toDataURL('image/jpeg', q);
+      while (out.length > 1_600_000 && q > 0.45) { q -= 0.1; out = c.toDataURL('image/jpeg', q); }
+      return out;
+    }
     if (key === 'logo') {
       const small = c.width > 900 || c.height > 900 ? toCanvas(c, 900) : c;
       const png = small.toDataURL('image/png');
@@ -407,7 +484,8 @@
     catch { return; }
     state.busy = true; $('buyBtn').disabled = true; $('mbarBtn').disabled = true; setStatus(T('Preparando o pedido…'));
     try {
-      const r = await Site.api('/api/orders', { method: 'POST', body: { spec, logo: imageData('logo'), photo: imageData('product'), lang: LANG, duration: spec.duration, brief: { sells: f.f_sells, diffs: f.f_diffs } } });
+      const gallery = spec.duration === 30 ? ['g0', 'g1', 'g2'].map(imageData).filter(Boolean) : [];
+      const r = await Site.api('/api/orders', { method: 'POST', body: { spec, logo: imageData('logo'), photo: imageData('product'), gallery, lang: LANG, duration: spec.duration, brief: { sells: f.f_sells, diffs: f.f_diffs } } });
       if (r.checkoutUrl) { setStatus(T('Abrindo o pagamento…'), 'ok'); location.href = r.checkoutUrl; return; }
       setStatus(r.checkoutError || T('Pedido criado. Abrindo…'));
       location.href = `${P('order')}/${r.order.id}`;
@@ -432,8 +510,8 @@
       const img = new Image(); img.src = `/api/orders/${o.id}/image/${kind}`; await img.decode();
       showImage(key, toCanvas(img, 1400), img.src, T('Imagem enviada na compra'));
     };
-    await Promise.all([load('logo', 'logo', r.hasLogo), load('product', 'photo', r.hasPhoto)]).catch(() => {});
-    ['f_logo', 'f_photo'].forEach((id2) => { $(id2).disabled = true; $(id2).closest('.drop').classList.add('locked'); });
+    await Promise.all([load('logo', 'logo', r.hasLogo), load('product', 'photo', r.hasPhoto), ...[0, 1, 2].map((i) => load('g' + i, 'gallery' + i, i < (r.galleryCount || 0)))]).catch(() => {});
+    ['f_logo', 'f_photo', 'f_g0', 'f_g1', 'f_g2'].forEach((id2) => { $(id2).disabled = true; $(id2).closest('.drop').classList.add('locked'); });
     $('f_name').disabled = true;
     document.querySelectorAll('input[name=dur]').forEach((el) => { el.disabled = true; });
     $('exampleNote').hidden = true; $('reviseNote').hidden = false; $('buyBox').hidden = true; $('reviseBox').hidden = false; $('mbar').hidden = true; document.body.classList.remove('has-mbar');
@@ -489,14 +567,14 @@
     $('f_segment').innerHTML = SEGMENTS.map((s) => `<option value="${s}">${Site.esc(T(s))}</option>`).join('');
     const opts = PU.ICON_LIST.map((k) => `<option value="${k}">${Site.esc(T(ICON_LABELS[k] || k))}</option>`).join('');
     $('bens').innerHTML = [1, 2, 3, 4].map((i) => `<div class="ben"><label class="fld"><span>${Site.esc(T('Vantagem {n}', { n: i }))}${i === 4 ? ' ' + Site.esc(T('(opcional)')) : ''} <i data-count="f_b${i}"></i></span><input type="text" id="f_b${i}" maxlength="30"></label><label class="fld"><span>${Site.esc(T('Ícone'))}</span><select id="f_i${i}">${opts}</select></label></div>`).join('');
-    const tl = $('tl'); SCENES.forEach((n) => { const d = document.createElement('div'); d.className = 'seg'; d.innerHTML = `<div class="bar"></div><small>${Site.esc(T(n))}</small>`; tl.appendChild(d); });
+    $('stepsBox').innerHTML = [1, 2, 3].map((i) => `<div class="ben"><label class="fld"><span>${Site.esc(T('Passo {n}', { n: i }))} <i data-count="f_s${i}"></i></span><input type="text" id="f_s${i}" maxlength="24"></label><label class="fld"><span>${Site.esc(T('Ícone'))}</span><select id="f_si${i}">${opts}</select></label></div>`).join('');
   }
   function bind() {
     const onEdit = (e) => {
       const id = e.target.id;
       if (id === 'f_c1') $('c1v').textContent = e.target.value.toUpperCase();
       if (id === 'f_c2') $('c2v').textContent = e.target.value.toUpperCase();
-      if (e.target.name === 'dur') setDuration(Number(e.target.value) === 20 ? 20 : 15);
+      if (e.target.name === 'dur') setDuration(durOf(e.target.value));
       if (id === 'f_name' && !state.exCleared && e.target.value.trim() !== EXAMPLE.f_name) {
         // os dados de contato, oferta e avaliação do exemplo fictício nunca podem ir para o vídeo de uma empresa real
         state.exCleared = true;
@@ -530,7 +608,8 @@
       catch (e) { Site.toast(e.message, true); }
     });
     $('clearBtn').addEventListener('click', () => { state.exCleared = true; writeForm(EMPTY); $('exampleNote').hidden = true; saveDraft(); rebuild(); seek(0); $('f_name').focus(); });
-    bindUpload('logo'); bindUpload('product');
+    bindUpload('logo'); bindUpload('product'); bindUpload('g0'); bindUpload('g1'); bindUpload('g2');
+    $('board').addEventListener('click', (e) => { const b = e.target.closest('.shot'); if (b) { seek(Number(b.dataset.t) || 0); if (!state.playing) state.dirty = true; } });
     new ResizeObserver(sizeCanvas).observe(pv);
   }
   async function fonts() {

@@ -144,7 +144,7 @@ function orderView(o) {
 api.post('/api/orders', async (req, res) => {
   const user = Auth.requireUser(req);
   limit(`order:${user.id}`, 30, DAY, 'Você criou muitos pedidos hoje. Fale com o suporte se precisar de mais.');
-  const b = await readJson(req, 9 * 1024 * 1024);
+  const b = await readJson(req, 16 * 1024 * 1024);
   const lang = LANGS.includes(b.lang) ? b.lang : langOf(req);
   const duration = DURATIONS.includes(Number(b.duration)) ? Number(b.duration) : 15;
   // os dados da empresa fictícia do exemplo nunca vão para o vídeo de um cliente; só o dono pode usá-los (vídeos de demonstração)
@@ -153,7 +153,7 @@ api.post('/api/orders', async (req, res) => {
   const problems = specProblems(spec);
   if (problems.length) fail(400, problems[0]);
   if (!demo && isExampleBrand(spec.brand.name)) fail(400, 'Troque o exemplo pelos dados da sua empresa antes de comprar.');
-  const images = { logo: Orders.decodeImage(b.logo), photo: Orders.decodeImage(b.photo) };
+  const images = { logo: Orders.decodeImage(b.logo), photo: Orders.decodeImage(b.photo), gallery: (Array.isArray(b.gallery) ? b.gallery : []).slice(0, 3).map(Orders.decodeImage).filter(Boolean) };
   const order = Orders.createOrder(user, spec, images, { lang, duration });
   // a identidade deste pedido vira a "minha marca" do cliente (próximo vídeo começa igual)
   if (!isExampleBrand(spec.brand.name)) {
@@ -189,13 +189,13 @@ api.get('/api/orders/:id', async (req, res, { params, query }) => {
 api.get('/api/orders/:id/spec', async (req, res, { params }) => {
   const user = Auth.requireUser(req);
   const o = Orders.orderFor(params.id, user, Auth.isAdmin(user));
-  json(res, 200, { spec: JSON.parse(o.spec), hasLogo: !!Orders.imagePath(o.id, 'logo'), hasPhoto: !!Orders.imagePath(o.id, 'photo'), order: orderView(o) });
+  json(res, 200, { spec: JSON.parse(o.spec), hasLogo: !!Orders.imagePath(o.id, 'logo'), hasPhoto: !!Orders.imagePath(o.id, 'photo'), galleryCount: Orders.galleryCount(o), order: orderView(o) });
 });
 
 api.get('/api/orders/:id/image/:kind', async (req, res, { params }) => {
   const user = Auth.requireUser(req);
   const o = Orders.orderFor(params.id, user, Auth.isAdmin(user));
-  const f = ['logo', 'photo'].includes(params.kind) && Orders.imagePath(o.id, params.kind);
+  const f = Orders.imagePath(o.id, params.kind);
   if (!f || !sendFile(req, res, f, { cache: 'private, max-age=600' })) fail(404, 'Imagem não encontrada.');
 });
 
@@ -222,8 +222,8 @@ api.post('/api/orders/:id/revise', async (req, res, { params }) => {
   const problems = specProblems(spec);
   if (problems.length) fail(400, problems[0]);
   if (!sameBrand(spec.brand.name, o.brand)) fail(400, 'Na correção, o nome da empresa continua “{brand}”.', { vars: { brand: o.brand } });
-  // nome, idioma e duração ficam os do pedido pago
-  spec.brand.name = o.brand; spec.lang = o.lang; spec.duration = o.duration;
+  // nome, idioma, duração e as fotos guardadas ficam os do pedido pago
+  spec.brand.name = o.brand; spec.lang = o.lang; spec.duration = o.duration; spec.media = { gallery: Orders.galleryCount(o) };
   const changed = tx(() => q(`UPDATE orders SET spec = ?, edits_left = edits_left - 1, status = 'paid', render_attempts = 0, render_after = 0, render_error = NULL, updated_at = ?
                               WHERE id = ? AND status = 'ready' AND edits_left > 0`).run(JSON.stringify(spec), now(), o.id).changes);
   if (!changed) fail(409, 'Não deu para aplicar a correção. Atualize a página.');

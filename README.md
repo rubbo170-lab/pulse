@@ -1,18 +1,29 @@
-# Pulso — vídeos animados de 15 ou 20 s para empresas
+# Pulso — vídeos animados de 15, 20 ou 30 s para empresas
 
 O cliente preenche os dados da empresa, a IA escreve o roteiro e ele assiste à prévia animada, com música, na hora. Quando gostar, paga por vídeo e o servidor gera o MP4 final em alta, sem a marca "PRÉVIA".
 
 - **Três idiomas:** português (`/`), inglês (`/en`) e espanhol (`/es`): site, editor, roteiro da IA e os textos dentro do vídeo.
 - **Duas moedas:** em português cobra em **reais** pelo Mercado Pago (Pix e cartão); em inglês e espanhol cobra em **dólar** pelo Stripe (cartão, Apple Pay, Google Pay).
 - **Sem versão grátis:** a prévia é só para ver (marca "PRÉVIA", resolução reduzida). O arquivo em alta só sai do servidor depois do pagamento confirmado.
-- **Preço por vídeo**, sem assinatura (padrão R$ 29,90 / R$ 34,90 e US$ 9.90 / US$ 12.90 para 15 / 20 s). Inclui 1 correção de texto grátis.
+- **Preço por vídeo**, sem assinatura (padrão R$ 29,90 / R$ 34,90 / R$ 44,90 e US$ 9.90 / US$ 12.90 / US$ 16.90 para 15 / 20 / 30 s). Inclui 1 correção de texto grátis.
+- **Três durações:**
+  - **15 s:** oito cenas rápidas (gancho, problema, busca, revelação, vantagens, prova, contato, marca).
+  - **20 s:** as mesmas cenas, com mais tempo para ler e trilha mais calma.
+  - **30 s:** as oito cenas e mais quatro, ligadas no compasso da música:
+    - até 3 fotos ou prints do cliente (cardápio, site, app, Instagram), quebrados em peças que se montam, com zoom e um toque na parte principal;
+    - um passo a passo de 3 etapas com ícones que se desenham;
+    - um depoimento real (sem depoimento, a oferta ou a principal vantagem);
+    - uma frase final grande, no estilo Apple.
+
+    A trilha acompanha: a batida recua no depoimento e volta com uma subida antes do contato.
+- **Storyboard no editor:** uma miniatura por cena, tirada do próprio vídeo; tocar numa cena leva até ela.
 - **Duas animações:**
   - **Dinâmico:** cortes rápidos, brilho e impacto (promoções, comida).
   - **Premium:** estilo "filme de produto" da Apple. As palavras pousam uma a uma na batida (desfoque → nítido), as cenas se ligam por movimentos mágicos (o campo de busca vira a etiqueta da marca, o último ícone vira o cartão da prova), a câmera respira sem tremer, um cursor clica de verdade e os efeitos sonoros são poucos e baixos. Sem brilhos, partículas nem flashes.
 - **A marca do cliente manda:**
   - as cores saem do próprio logo (automático, com opção de trocar);
   - cada conta tem "minha marca" salva (logo, cores, estilo, contatos), então o próximo vídeo já começa igual.
-- **Vídeo final:** MP4 H.264 + AAC, 1080×1920, 60 fps, 15 ou 20 s, trilha original gerada pelo próprio Pulso. Cada arquivo passa por uma conferência automática antes de ser entregue: duração, vídeo e áudio, e um quadro do MP4 é decodificado e comparado com o que foi desenhado (pega cor errada e quadro fora de ordem). Vem com uma **capa JPG** em 1080×1920 para o Reels. Fica 30 dias em "Meus vídeos".
+- **Vídeo final:** MP4 H.264 + AAC, 1080×1920, 60 fps, 15, 20 ou 30 s, trilha original gerada pelo próprio Pulso. Cada arquivo passa por uma conferência automática antes de ser entregue: duração, vídeo e áudio, e um quadro do MP4 é decodificado e comparado com o que foi desenhado (pega cor errada e quadro fora de ordem). Vem com uma **capa JPG** em 1080×1920 para o Reels. Fica 30 dias em "Meus vídeos".
 - **Painel `/admin`:**
   - vendas em reais e em dólar, pedidos e alertas;
   - refazer vídeo, reembolso (inclusive de cobrança em dobro), link de nova senha e backup do banco.
@@ -116,12 +127,12 @@ As páginas em português (`views/`) são o modelo. Inglês e espanhol saem dos 
 ## Custos para rodar (estimativa)
 
 - **Railway Hobby:** US$ 5/mês, com US$ 5 de uso incluídos. Parado, o site consome pouco. Cada vídeo usa alguns minutos de CPU.
-- **Volume:** o plano Hobby permite até 5 GB. Cada vídeo tem de 6 a 20 MB e fica guardado 30 dias. Isso comporta uns 300 vídeos no mês. Se passar disso, mude para o plano Pro ou reduza `VIDEO_RETENTION_DAYS`.
+- **Volume:** o plano Hobby permite até 5 GB. Cada vídeo tem de 6 a 20 MB (o de 30 s chega a uns 45 MB) e fica guardado 30 dias. Isso comporta uns 250 vídeos no mês. Se passar disso, mude para o plano Pro ou reduza `VIDEO_RETENTION_DAYS`.
 - **Mercado Pago e Stripe:** taxa por venda. **Anthropic:** centavos por roteiro.
 
 ## Tempo de geração
 
-Medido aqui com 2 CPUs: de 3 a 5 minutos por vídeo a 60 fps. O Premium é tão rápido quanto o Dinâmico, e o de 20 s leva cerca de um terço a mais. Com mais CPUs fica mais rápido, porque o servidor desenha em paralelo em até 4 abas (`RENDER_PAGES`). Os pedidos entram numa fila, e a página do pedido mostra a posição, a porcentagem e o tempo restante.
+Medido aqui com 2 CPUs: de 3 a 5 minutos por vídeo a 60 fps. O Premium é tão rápido quanto o Dinâmico; o de 20 s leva cerca de um terço a mais, e o de 30 s, quase o dobro (de 6 a 10 minutos). Com mais CPUs fica mais rápido, porque o servidor desenha em paralelo em até 4 abas (`RENDER_PAGES`). Os pedidos entram numa fila, e a página do pedido mostra a posição, a porcentagem e o tempo restante.
 
 ---
 
@@ -153,7 +164,8 @@ npm start                 # http://localhost:3000
 Sem as chaves de pagamento o site funciona e mostra a prévia, mas não cobra. Pelo `/admin`, você consegue marcar um pedido como pago para testar o render.
 
 **Teste completo:** `npm test` usa um navegador de verdade, Mercado Pago, Stripe e Anthropic falsos e o render real. Ele cobre:
-- a compra em reais (Pix) e em dólar (Stripe, 20 s, Premium), com download e capa;
+- a compra em reais (Pix) e em dólar (Stripe: 20 s Premium em inglês; 30 s com fotos e depoimento em espanhol), com download e capa;
+- o vídeo de 30 s: preço, cenas extras, storyboard, fotos guardadas no pedido, duração do MP4 e a trilha em cada parte;
 - a correção grátis e a marca salva;
 - o painel, os reembolsos e os avisos assinados;
 - os três idiomas e as proteções de segurança.

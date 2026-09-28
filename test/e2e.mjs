@@ -1,6 +1,6 @@
 // Teste de ponta a ponta: navegador de verdade + Mercado Pago, Stripe e Anthropic falsos + render real.
 // Uso: node --disable-warning=ExperimentalWarning test/e2e.mjs   (precisa do Playwright global e de ffmpeg)
-import { spawn, execFileSync } from 'node:child_process';
+import { spawn, spawnSync, execFileSync } from 'node:child_process';
 import { createRequire } from 'node:module';
 import crypto from 'node:crypto';
 import fs from 'node:fs';
@@ -46,11 +46,13 @@ const probe = (file) => {
   const pr = JSON.parse(execFileSync('ffprobe', ['-v', 'error', '-show_entries', 'stream=codec_name,width,height,r_frame_rate,pix_fmt,sample_rate,channels:format=duration,size', '-of', 'json', file]));
   return { v: pr.streams.find((s) => s.codec_name === 'h264'), a: pr.streams.find((s) => s.codec_name === 'aac'), dur: Number(pr.format.duration), size: Number(pr.format.size) };
 };
+// volume médio (dB) de um trecho do áudio
+const loudness = (file, ss, t) => { const r = spawnSync('ffmpeg', ['-hide_banner', '-ss', String(ss), '-t', String(t), '-i', file, '-vn', '-af', 'volumedetect', '-f', 'null', '-'], { encoding: 'utf8' }); const m = /mean_volume: (-?[\d.]+) dB/.exec(r.stderr || ''); return m ? Number(m[1]) : -99; };
 
 const browser = await chromium.launch({ executablePath: process.env.PW_CHROME || '/opt/pw-browsers/chromium', args: ['--disable-gpu'] });
 const pageErrors = [];
 const watch = (page, tag) => { page.on('pageerror', (e) => pageErrors.push(`${tag}: ${e.message}`)); page.on('console', (m) => { if (m.type() === 'error' && !/favicon|404|401|403|429|409/.test(m.text())) pageErrors.push(`${tag} console: ${m.text()}`); }); };
-let orderId = null, enOrder = null;
+let orderId = null, enOrder = null, esOrder = null;
 
 try {
   // ── 1. página inicial
@@ -59,7 +61,7 @@ try {
   await page.goto(BASE + '/');
   await page.waitForTimeout(800);
   const priceCard = nb(await page.textContent('.price-card'));
-  check('página inicial carrega com os preços de 15 e 20 s', priceCard.includes('R$ 29,90') && priceCard.includes('R$ 34,90'), priceCard.replace(/\s+/g, ' ').slice(0, 90));
+  check('página inicial carrega com os preços de 15, 20 e 30 s', priceCard.includes('R$ 29,90') && priceCard.includes('R$ 34,90') && priceCard.includes('R$ 44,90'), priceCard.replace(/\s+/g, ' ').slice(0, 90));
   await page.screenshot({ path: path.join(SHOTS, '01-inicio.png'), fullPage: true });
 
   // ── 2. editor: dados reais, exemplo apagado, roteiro com IA, logo
@@ -83,6 +85,23 @@ try {
   await page.screenshot({ path: path.join(SHOTS, '02-editor.png'), fullPage: false });
   const wm = await page.evaluate(() => { const c = document.getElementById('pv'); const x = c.getContext('2d'); const d = x.getImageData(0, 0, c.width, Math.round(c.height * 0.06)).data; let bright = 0; for (let i = 0; i < d.length; i += 4) if (d[i] > 200 && d[i + 1] > 200 && d[i + 2] > 200) bright++; return bright; });
   check('prévia mostra a marca PRÉVIA', wm > 50, `${wm} px claros no topo`);
+
+  // ── 2b. vídeo de 30 s: preço, cenas extras, textos da IA e storyboard (depois volta para 15 s)
+  await page.click('label:has(input[name=dur][value="30"])');
+  await page.waitForFunction(() => document.querySelectorAll('#board .shot').length === 12, null, { timeout: 8000 }).catch(() => {});
+  const now30 = await page.evaluate(() => [...document.querySelectorAll('[data-price-now]')].map((e) => e.textContent.trim()));
+  check('30 s: preço de R$ 44,90 e painel de cenas extras', now30.length > 0 && now30.every((t) => nb(t) === 'R$ 44,90') && (await page.isVisible('#panel30')) && (await page.textContent('#specPill')).startsWith('30 s'), now30.map(nb).join(' | '));
+  check('30 s: IA escreveu o título das fotos e o passo a passo', (await page.inputValue('#f_showTitle')) === 'Nosso cardápio' && (await page.inputValue('#f_stepsTitle')) === 'Como pedir' && (await page.inputValue('#f_s1')) === 'Escolha seu café' && (await page.inputValue('#f_si2')) === 'chat');
+  const board30 = await page.evaluate(() => [...document.querySelectorAll('#board .shot small')].map((e) => e.textContent));
+  check('30 s: storyboard com 12 cenas', board30.length === 12 && board30.includes('Em detalhes') && board30.includes('Como funciona') && board30.includes('Frase final'), board30.join(', '));
+  await page.click('#board .shot[data-i="9"]');
+  await page.waitForTimeout(300);
+  const tAt = await page.evaluate(() => PulsoEditor.state.t);
+  check('30 s: tocar numa cena do storyboard leva até ela', tAt > 22 && tAt < 27, `t = ${tAt.toFixed(2)} s`);
+  await page.screenshot({ path: path.join(SHOTS, '02b-editor-30s.png'), fullPage: true });
+  await page.click('label:has(input[name=dur][value="15"])');
+  await page.waitForFunction(() => document.querySelectorAll('#board .shot').length === 8, null, { timeout: 8000 }).catch(() => {});
+  check('volta para 15 s: painel escondido e 8 cenas', (await page.isHidden('#panel30')) && (await page.evaluate(() => document.querySelectorAll('#board .shot').length)) === 8 && nb(await page.textContent('[data-price-now]')) === 'R$ 29,90');
 
   // ── 3. compra: cadastro na janela, checkout, Pix aprovado, volta ao pedido
   await page.click('#buyBtn');
@@ -110,7 +129,7 @@ try {
   await ep.goto(BASE + '/en');
   await ep.waitForTimeout(800);
   const enCard = nb(await ep.textContent('.price-card'));
-  check('EN: landing em inglês com preço em dólar', (await ep.getAttribute('html', 'lang')) === 'en' && enCard.includes('US$ 9.90') && enCard.includes('US$ 12.90') && !/vídeo|você/i.test(await ep.textContent('main')), enCard.replace(/\s+/g, ' ').slice(0, 80));
+  check('EN: landing em inglês com preço em dólar', (await ep.getAttribute('html', 'lang')) === 'en' && enCard.includes('US$ 9.90') && enCard.includes('US$ 12.90') && enCard.includes('US$ 16.90') && !/vídeo|você/i.test(await ep.textContent('main')), enCard.replace(/\s+/g, ' ').slice(0, 80));
   await ep.screenshot({ path: path.join(SHOTS, '20-en-inicio.png'), fullPage: true });
   await ep.click('.hero-cta a.btn.primary');
   await ep.waitForURL('**/en/create');
@@ -147,21 +166,52 @@ try {
   await ep.waitForFunction(() => /Payment confirmed|Rendering|ready/.test(document.getElementById('oTitle').textContent), null, { timeout: 30000 });
   check('EN: pagamento confirmado (retorno + aviso assinado do Stripe)', true, await ep.textContent('#oTitle'));
 
-  // ── 3c. espanhol: editor e preço sem comprar
-  const sctx = await browser.newContext({ viewport: { width: 1280, height: 860 }, locale: 'es-MX' });
+  // ── 3c. espanhol: vídeo de 30 s com 2 fotos e depoimento, pago em dólar pelo Stripe
+  const sctx = await browser.newContext({ viewport: { width: 1280, height: 860 }, acceptDownloads: true, locale: 'es-MX' });
   const sp = await sctx.newPage(); watch(sp, 'espanol');
   await sp.goto(BASE + '/es/crear');
   await sp.waitForFunction(() => window.PulsoEditor && PulsoEditor.state.engine, null, { timeout: 30000 });
   await sp.fill('#f_name', 'Café La Esquina');
   await sp.fill('#f_sells', 'Café de especialidad y pan dulce');
+  await sp.fill('#f_whats', '55 1234 5678');
   await sp.click('#aiBtn');
   await sp.waitForFunction(() => document.getElementById('f_hook2').value === 'QUE ABRAZA', null, { timeout: 15000 });
-  await sp.click('label:has(input[name=dur][value="20"])');
-  await sp.waitForTimeout(500);
+  await sp.click('label:has(input[name=dur][value="30"])');
+  await sp.setInputFiles('#f_g0', path.join(ROOT, 'test/examples/gallery/app-cardapio.jpg'));
+  await sp.setInputFiles('#f_g1', path.join(ROOT, 'test/examples/gallery/fotos.jpg'));
+  await sp.fill('#f_quote', '¡El mejor café del barrio!');
+  await sp.fill('#f_author', 'Lucía R., clienta');
+  await sp.waitForFunction(() => PulsoEditor.state.gallery.filter(Boolean).length === 2, null, { timeout: 10000 });
+  await sp.waitForFunction(() => [...document.querySelectorAll('#board .shot small')].some((e) => e.textContent === 'Testimonio'), null, { timeout: 8000 }).catch(() => {});
   const esNow = await sp.evaluate(() => [...document.querySelectorAll('[data-price-now]')].map((e) => e.textContent.trim()));
-  check('ES: editor em espanhol, IA em espanhol e 20 s em dólar', (await sp.getAttribute('html', 'lang')) === 'es' && mocks.log.includes('ai:es') && esNow.every((t) => t === 'US$ 12.90'), esNow.join(' | '));
-  await sp.screenshot({ path: path.join(SHOTS, '22-es-editor.png') });
-  await sctx.close();
+  check('ES: editor e IA em espanhol, 30 s a US$ 16.90', (await sp.getAttribute('html', 'lang')) === 'es' && mocks.log.includes('ai:es') && esNow.length > 0 && esNow.every((t) => t === 'US$ 16.90') && (await sp.inputValue('#f_s1')) === 'Elige tu café', esNow.join(' | '));
+  const esBoard = await sp.evaluate(() => [...document.querySelectorAll('#board .shot small')].map((e) => e.textContent));
+  const esPanel = await sp.textContent('#panel30');
+  check('ES: cenas extras e storyboard em espanhol, com depoimento', esBoard.length === 12 && esBoard.includes('En detalle') && esBoard.includes('Testimonio') && /Escenas del video de 30 s/.test(esPanel) && !/Depoimento|Imagem|Enviar/.test(esPanel), esBoard.join(', '));
+  await sp.screenshot({ path: path.join(SHOTS, '22-es-editor-30s.png'), fullPage: true });
+  await sp.click('#buyBtn');
+  await sp.waitForSelector('.modal form');
+  await sp.fill('.modal input[name=name]', 'Carlos Comprador');
+  await sp.fill('.modal input[name=email]', 'carlos@comprador.test');
+  await sp.fill('.modal input[name=password]', 'contrasena-carlos-1');
+  await sp.check('.modal input[name=accept]');
+  const esReq = []; const t0es = Date.now();
+  sp.on('request', (r) => { if (r.url().startsWith(BASE + '/api/')) esReq.push(`${Date.now() - t0es}ms → ${r.method()} ${r.url().slice(BASE.length)}`); });
+  sp.on('response', (r) => { if (r.url().startsWith(BASE + '/api/')) esReq.push(`${Date.now() - t0es}ms ← ${r.status()} ${r.url().slice(BASE.length)}`); });
+  await sp.click('.modal button[type=submit]');
+  try { await sp.waitForURL(/\/stripe\/checkout\//, { timeout: 90000 }); }
+  catch (e) { await sp.screenshot({ path: path.join(SHOTS, '22b-es-compra-travou.png') }).catch(() => {}); console.log('ES compra:', esReq.join(' | '), '| status:', await sp.textContent('#status').catch(() => '?')); throw e; }
+  check('ES: pedido de 30 s com fotos abre o checkout', true, esReq.filter((x) => /orders/.test(x)).join(' | '));
+  const sn30 = [...mocks.sessions.values()].pop();
+  esOrder = sn30.client_reference_id;
+  check('ES: sessão do Stripe em dólar com valor de 30 s', sn30.amount_total === 1690 && sn30.currency === 'usd' && sn30.locale === 'es' && /30 s/.test(sn30.product_name) && sn30.success_url === `${BASE}/es/pedido/${esOrder}?session_id={CHECKOUT_SESSION_ID}`, `${sn30.product_name}`);
+  await sp.click('#stripePay');
+  await sp.waitForURL(/\/es\/pedido\/[a-z0-9]{16}\?session_id=cs_test_/, { timeout: 30000 });
+  const esSaved = await sp.evaluate(async (id) => (await fetch(`/api/orders/${id}/spec`)).json(), esOrder);
+  check('ES: pedido guardou 30 s, 2 fotos, passo a passo e depoimento', esSaved.spec.duration === 30 && esSaved.galleryCount === 2 && esSaved.spec.proof.quote === '¡El mejor café del barrio!' && esSaved.spec.proof.author === 'Lucía R., clienta' && esSaved.spec.script.steps.length === 3 && esSaved.spec.script.showcaseTitle === 'Nuestro menú', JSON.stringify(esSaved.spec.script.steps).slice(0, 120));
+  const g0 = await sp.evaluate(async (id) => { const r = await fetch(`/api/orders/${id}/image/gallery0`); return { s: r.status, type: r.headers.get('content-type') }; }, esOrder);
+  const g2 = await sp.evaluate(async (id) => (await fetch(`/api/orders/${id}/image/gallery2`)).status, esOrder);
+  check('ES: fotos do pedido guardadas (e só as enviadas)', g0.s === 200 && /image\/(jpeg|png)/.test(g0.type) && g2 === 404, `${g0.s} ${g0.type} · gallery2 ${g2}`);
 
   // ── 3d. volta para a Maria: espera o vídeo de 15 s
   await page.waitForFunction(() => /Gerando/.test(document.getElementById('oTitle').textContent), null, { timeout: 60000 }).catch(() => {});
@@ -197,6 +247,21 @@ try {
   check('EN: MP4 de 20 s, 1080x1920 + AAC', dl2.suggestedFilename() === 'pulso-bean-there-cafe.mp4' && p20.v && p20.v.width === 1080 && p20.a && Math.abs(p20.dur - 20) < 0.1, `${dl2.suggestedFilename()} · ${p20.dur.toFixed(2)} s · ${(p20.size / 1e6).toFixed(1)} MB`);
   const enSpec = await ep.evaluate(async (id) => (await (await fetch(`/api/orders/${id}/spec`)).json()).spec, enOrder);
   check('EN: pedido guardou a animação Premium', enSpec.style.motion === 'premium' && enSpec.duration === 20 && enSpec.lang === 'en');
+
+  // ── 4c. vídeo de 30 s em espanhol: duração, trilha nas cenas novas e quadros das cenas novas
+  const t30 = Date.now();
+  await sp.waitForFunction(() => document.getElementById('oTitle').textContent.includes('listo'), null, { timeout: 20 * 60e3, polling: 2000 });
+  await sp.waitForTimeout(1200);
+  await sp.screenshot({ path: path.join(SHOTS, '29-es-pronto-30s.png') });
+  const [dl3] = await Promise.all([sp.waitForEvent('download'), sp.click('#oActions a.btn.primary')]);
+  const mp30 = path.join(DATA, 'baixado-30s.mp4');
+  await dl3.saveAs(mp30);
+  const p30 = probe(mp30);
+  check('ES: MP4 de 30 s, 1080x1920 + AAC', dl3.suggestedFilename() === 'pulso-cafe-la-esquina.mp4' && p30.v && p30.v.width === 1080 && p30.v.height === 1920 && p30.a && Math.abs(p30.dur - 30) < 0.1, `${dl3.suggestedFilename()} · ${p30.dur.toFixed(2)} s · ${(p30.size / 1e6).toFixed(1)} MB · ${((Date.now() - t30) / 1000).toFixed(0)} s de espera`);
+  const vols = [[0.5, 6], [8, 3], [12, 2.5], [19.5, 2.5], [23, 3], [27, 2.5]].map(([s, d]) => loudness(mp30, s, d));
+  check('ES: trilha tocando em todas as partes, com respiro no depoimento', vols.every((v) => v > -32) && vols[3] < vols[4], vols.map((v) => v.toFixed(1)).join(' / ') + ' dB');
+  const frames = [9.5, 13.9, 20.5, 24.5].map((s) => { const f = path.join(SHOTS, `30-es-quadro-${String(s).replace('.', '_')}.jpg`); execFileSync('ffmpeg', ['-v', 'error', '-y', '-ss', String(s), '-i', mp30, '-frames:v', '1', '-vf', 'scale=540:-2', '-q:v', '3', f]); return fs.statSync(f).size; });
+  check('ES: cenas novas com conteúdo (fotos, passos, depoimento, frase final)', frames.every((n) => n > 14000), frames.map((n) => `${Math.round(n / 1000)} KB`).join(' / '));
 
   // ── 5. correção grátis
   await page.click('#oActions a[href*="revisar"]');
@@ -251,6 +316,11 @@ try {
     const overflow = await mp.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
     check(`editor sem rolagem lateral no celular (${p})`, overflow <= 1, `${overflow}px`);
   }
+  await mp.goto(BASE + '/criar'); await mp.waitForFunction(() => window.PulsoEditor && PulsoEditor.state.engine, null, { timeout: 30000 });
+  await mp.click('label:has(input[name=dur][value="30"])'); await mp.waitForTimeout(1200);
+  await mp.screenshot({ path: path.join(SHOTS, '09b-celular-editor-30s.png'), fullPage: true });
+  const ov30 = await mp.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
+  check('editor de 30 s sem rolagem lateral no celular', ov30 <= 1 && (await mp.isVisible('#panel30')), `${ov30}px`);
   for (const [p, shot] of [['/en', '27-celular-en-inicio.png'], ['/es', '28-celular-es-inicio.png']]) {
     await mp.goto(BASE + p); await mp.waitForTimeout(700);
     await mp.screenshot({ path: path.join(SHOTS, shot), fullPage: true });
@@ -266,7 +336,7 @@ try {
   check('outra conta não vê o pedido da Maria', (await bob('GET', `/api/orders/${orderId}`)).status === 404);
   check('outra conta não baixa o vídeo da Maria', (await bob('GET', `/api/orders/${orderId}/video`)).status === 404);
   check('pedido de outro site é bloqueado (origem)', (await bob('POST', '/api/auth/logout', {}, { origin: 'https://site-malicioso.test' })).status === 403);
-  const big = await bob('POST', '/api/orders', JSON.stringify({ x: 'a'.repeat(13 * 1024 * 1024) }));
+  const big = await bob('POST', '/api/orders', JSON.stringify({ x: 'a'.repeat(17 * 1024 * 1024) }));
   check('envio gigante é recusado', big.status === 413, String(big.status));
   for (const p of ['/..%2fserver.js', '/%2e%2e/server.js', '/js/..%2f..%2fserver.js', '/.env', '/../.env', '/i18n/en.json', '/views/index.html']) {
     let r = await bob('GET', p);
@@ -337,7 +407,7 @@ try {
   await ap.waitForTimeout(800);
   await ap.screenshot({ path: path.join(SHOTS, '10-admin.png'), fullPage: true });
   const kpi = nb(await ap.textContent('#kpis'));
-  check('painel mostra as vendas em reais e em dólar', kpi.includes('R$ 59,80') && kpi.includes('US$ 12.90'), kpi.replace(/\s+/g, ' ').slice(0, 120));
+  check('painel mostra as vendas em reais e em dólar', kpi.includes('R$ 59,80') && kpi.includes('US$ 29.80'), kpi.replace(/\s+/g, ' ').slice(0, 120));
   const alerts = await ap.textContent('#alerts');
   check('painel alerta valor errado e cobrança em dobro', alerts.includes('Pagamento diferente') && alerts.includes('Cobrança em dobro'));
   check('painel mostra Stripe e Mercado Pago ligados', (await ap.textContent('#cfg')).includes('Stripe ligado') && (await ap.textContent('#cfg')).includes('Mercado Pago ligado'));
@@ -378,6 +448,7 @@ try {
   check('backup do banco', backup.s === 200 && backup.head === 'SQLite format 3', `${backup.n} bytes`);
   await actx.close();
   await ectx.close();
+  await sctx.close();
   await ctx.close();
 } catch (e) {
   check('execução sem erro', false, e.stack || e.message);
