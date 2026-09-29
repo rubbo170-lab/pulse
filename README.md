@@ -6,20 +6,17 @@ O cliente preenche os dados da empresa, a IA escreve o roteiro e ele assiste à 
 - **Duas moedas:** em português cobra em **reais** pelo Mercado Pago (Pix e cartão); em inglês e espanhol cobra em **dólar** pelo Stripe (cartão, Apple Pay, Google Pay).
 - **Sem versão grátis:** a prévia é só para ver (marca "PRÉVIA", resolução reduzida). O arquivo em alta só sai do servidor depois do pagamento confirmado.
 - **Preço por vídeo**, sem assinatura (padrão R$ 29,90 / R$ 34,90 / R$ 44,90 e US$ 9.90 / US$ 12.90 / US$ 16.90 para 15 / 20 / 30 s). Inclui 1 correção de texto grátis.
-- **Três durações:**
-  - **15 s:** oito cenas rápidas (gancho, problema, busca, revelação, vantagens, prova, contato, marca).
-  - **20 s:** as mesmas cenas, com mais tempo para ler e trilha mais calma.
-  - **30 s:** as oito cenas e mais quatro, ligadas no compasso da música:
-    - até 3 fotos ou prints do cliente (cardápio, site, app, Instagram), quebrados em peças que se montam, com zoom e um toque na parte principal;
-    - um passo a passo de 3 etapas com ícones que se desenham;
-    - um depoimento real (sem depoimento, a oferta ou a principal vantagem);
-    - uma frase final grande, no estilo Apple.
+- **Cada vídeo é único (motor criativo "Studio"):** cada pedido nasce com uma semente própria, e dela sai um plano inteiro:
+  - **visual** (direção de arte): Colagem pop, Impacto, Editorial, Neon, Minimalista, Retrô, Tipográfico ou Orgânico. Cada um tem letras próprias (13 estilos de título), paletas tiradas das cores da marca, fundos, molduras de foto, decorações, jeito de destacar palavras e transições;
+  - **história** (a ordem das cenas): problema e solução, direto ao ponto, pergunta e resposta, a busca, oferta primeiro, prova primeiro, lista de motivos ou marca e slogan. Só entram histórias que os dados sustentam (sem oferta, não há "oferta primeiro");
+  - **cenas:** cada tipo de cena tem várias composições (37 no total), sorteadas sem repetir no mesmo vídeo e só quando o texto cabe nelas;
+  - **música:** gênero pelo visual (pop, funk, house, trap, lo-fi, cinematográfica, synth, minimal, disco, techno, acústica), tom, progressão de acordes e andamento próprios. O andamento fecha compassos inteiros na duração, então música e vídeo terminam juntos no tempo 1 e o loop não emenda torto. A música entra no gancho, recua no problema, abre no produto, sobe antes do contato e fecha na marca; os efeitos caem nas transições, palavras, itens e toques da imagem.
 
-    A trilha acompanha: a batida recua no depoimento e volta com uma subida antes do contato.
+  O cliente escolhe um visual ou deixa em **Surpresa** (a IA sugere o visual e as palavras de destaque junto com o roteiro), e o botão **Outro visual** sorteia outra semente. A mesma semente com os mesmos dados sempre dá o mesmo vídeo: a prévia é exatamente o que o servidor renderiza.
+- **Três durações:** 15, 20 e 30 s, cada uma com o próprio plano (o de 20 s não é o de 15 esticado). No de 30 s entram cenas extras: fotos ou prints do cliente (quando enviados), passo a passo, depoimento real (ou prova ou oferta), frase e contato.
+- **Texto do cliente nunca é cortado:** se não couber, o motor tenta mais uma linha, letra menor e, por fim, a letra do texto corrido.
 - **Storyboard no editor:** uma miniatura por cena, tirada do próprio vídeo; tocar numa cena leva até ela.
-- **Duas animações:**
-  - **Dinâmico:** cortes rápidos, brilho e impacto (promoções, comida).
-  - **Premium:** estilo "filme de produto" da Apple. As palavras pousam uma a uma na batida (desfoque → nítido), as cenas se ligam por movimentos mágicos (o campo de busca vira a etiqueta da marca, o último ícone vira o cartão da prova), a câmera respira sem tremer, um cursor clica de verdade e os efeitos sonoros são poucos e baixos. Sem brilhos, partículas nem flashes.
+- **Vídeos já pagos continuam no motor antigo** (Dinâmico e Premium, com as mesmas 8 cenas fixas), inclusive na correção grátis. Só pedidos com a direção criativa (`spec.creative`, v2) usam o motor novo.
 - **A marca do cliente manda:**
   - as cores saem do próprio logo (automático, com opção de trocar);
   - cada conta tem "minha marca" salva (logo, cores, estilo, contatos), então o próximo vídeo já começa igual.
@@ -200,7 +197,11 @@ lib/i18n.js, paths.js  tradução das páginas e endereços por idioma
 lib/render/            fila de render: Chrome sem tela (protocolo DevTools por pipe) + ffmpeg + conferência do MP4
 views/                 páginas (modelo em português)
 public/                CSS, JS e mídia do site
-public/js/engine*.js   motor de animação (Dinâmico e Premium) e trilha: o mesmo na prévia e no servidor
+public/js/studio*.js   motor criativo (pedidos novos): studio.js monta o plano de cada vídeo (visual, história, cenas,
+                       transições, andamento) e desenha; studio_scenes.js tem as composições de cada cena; studio_kit.js
+                       letras, paletas, texto animado, fundos, molduras e transições; studio_audio.js compõe a trilha
+public/js/engine*.js   motor antigo (Dinâmico e Premium, pedidos já pagos) e utilitários; audio.js tem os instrumentos
+public/fonts/          letras do site e do motor criativo (WOFF com licença OFL ao lado de cada uma)
 i18n/                  dicionários inglês/espanhol e o gerador
 test/                  teste de ponta a ponta, serviços falsos e gerador dos vídeos de exemplo
 ```

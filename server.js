@@ -224,6 +224,8 @@ api.post('/api/orders/:id/revise', async (req, res, { params }) => {
   if (!sameBrand(spec.brand.name, o.brand)) fail(400, 'Na correção, o nome da empresa continua “{brand}”.', { vars: { brand: o.brand } });
   // nome, idioma, duração e as fotos guardadas ficam os do pedido pago
   spec.brand.name = o.brand; spec.lang = o.lang; spec.duration = o.duration; spec.media = { gallery: Orders.galleryCount(o) };
+  // vídeo feito no motor antigo continua no motor antigo na correção (o visual pago não muda de repente)
+  if (!JSON.parse(o.spec).creative) delete spec.creative;
   const changed = tx(() => q(`UPDATE orders SET spec = ?, edits_left = edits_left - 1, status = 'paid', render_attempts = 0, render_after = 0, render_error = NULL, updated_at = ?
                               WHERE id = ? AND status = 'ready' AND edits_left > 0`).run(JSON.stringify(spec), now(), o.id).changes);
   if (!changed) fail(409, 'Não deu para aplicar a correção. Atualize a página.');

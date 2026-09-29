@@ -77,6 +77,8 @@ try {
   await page.click('#aiBtn');
   await page.waitForFunction(() => document.getElementById('f_hook1').value === 'CAFÉ', null, { timeout: 15000 });
   check('roteiro com IA (servidor) preenche os campos', (await page.inputValue('#f_product')) === 'Cappuccino da casa');
+  const aiDir = await page.evaluate(() => ({ cr: PulsoEditor.state.creative, look: PulsoEditor.state.engine.plan.look }));
+  check('IA sugere o visual (com "Surpresa" marcado) e as palavras de destaque', aiDir.cr.look === 'auto' && aiDir.cr.pref === 'editorial' && aiDir.look === 'editorial' && aiDir.cr.keys.hook === 'ABRAÇA' && aiDir.cr.keys.product === 'Cappuccino', JSON.stringify(aiDir.cr));
   const c1Before = await page.inputValue('#f_c1');
   await page.setInputFiles('#f_logo', path.join(ROOT, 'test/examples/burger-logo.png'));
   await page.waitForTimeout(1200);
@@ -87,21 +89,30 @@ try {
   check('prévia mostra a marca PRÉVIA', wm > 50, `${wm} px claros no topo`);
 
   // ── 2b. vídeo de 30 s: preço, cenas extras, textos da IA e storyboard (depois volta para 15 s)
+  const plan15 = await page.evaluate(() => ({ creative: PulsoEditor.state.creative, look: PulsoEditor.state.engine.plan && PulsoEditor.state.engine.plan.look, native: !!PulsoEditor.state.engine.native }));
+  check('vídeo novo usa o motor criativo (direção de arte própria, com semente)', plan15.native && plan15.creative && plan15.creative.v === 2 && Number.isInteger(plan15.creative.seed) && (await page.isVisible('#direction')) && (await page.isVisible('#looks')), `${plan15.look} · semente ${plan15.creative && plan15.creative.seed}`);
+  const shuffled = [];
+  for (let i = 0; i < 4; i++) { await page.click('#shuffleBtn'); await page.waitForTimeout(250); shuffled.push(await page.evaluate(() => [PulsoEditor.state.creative.seed, PulsoEditor.state.engine.plan.look, PulsoEditor.state.engine.plan.arc, PulsoEditor.state.engine.scenes.map((s) => s.key).join('-')].join(' '))); }
+  check('"Outro visual" sorteia outro vídeo (semente, visual, história ou cenas mudam)', new Set(shuffled).size === 4 && new Set(shuffled.map((x) => x.split(' ').slice(1).join(' '))).size >= 2, shuffled.join(' | '));
   await page.click('label:has(input[name=dur][value="30"])');
-  await page.waitForFunction(() => document.querySelectorAll('#board .shot').length === 12, null, { timeout: 8000 }).catch(() => {});
+  await page.waitForFunction(() => PulsoEditor.state.engine.DUR === 30 && document.querySelectorAll('#board .shot').length === PulsoEditor.state.engine.scenes.length, null, { timeout: 8000 }).catch(() => {});
   const now30 = await page.evaluate(() => [...document.querySelectorAll('[data-price-now]')].map((e) => e.textContent.trim()));
   check('30 s: preço de R$ 44,90 e painel de cenas extras', now30.length > 0 && now30.every((t) => nb(t) === 'R$ 44,90') && (await page.isVisible('#panel30')) && (await page.textContent('#specPill')).startsWith('30 s'), now30.map(nb).join(' | '));
   check('30 s: IA escreveu o título das fotos e o passo a passo', (await page.inputValue('#f_showTitle')) === 'Nosso cardápio' && (await page.inputValue('#f_stepsTitle')) === 'Como pedir' && (await page.inputValue('#f_s1')) === 'Escolha seu café' && (await page.inputValue('#f_si2')) === 'chat');
   const board30 = await page.evaluate(() => [...document.querySelectorAll('#board .shot small')].map((e) => e.textContent));
-  check('30 s: storyboard com 12 cenas', board30.length === 12 && board30.includes('Em detalhes') && board30.includes('Como funciona') && board30.includes('Frase final'), board30.join(', '));
-  await page.click('#board .shot[data-i="9"]');
+  const n30 = await page.evaluate(() => PulsoEditor.state.engine.scenes.length);
+  // sem fotos enviadas, o vídeo de 30 s não inventa a cena "Em detalhes" (ela aparece quando há foto ou prints)
+  check('30 s: storyboard com uma miniatura por cena e o passo a passo', board30.length === n30 && n30 >= 8 && board30.includes('Como funciona') && !board30.includes('Em detalhes'), board30.join(', '));
+  const iSteps = board30.indexOf('Como funciona');
+  await page.click(`#board .shot[data-i="${iSteps}"]`);
   await page.waitForTimeout(300);
-  const tAt = await page.evaluate(() => PulsoEditor.state.t);
-  check('30 s: tocar numa cena do storyboard leva até ela', tAt > 22 && tAt < 27, `t = ${tAt.toFixed(2)} s`);
+  const [tAt, sc30] = await page.evaluate((i) => [PulsoEditor.state.t, PulsoEditor.state.engine.scenes[i]], iSteps);
+  check('30 s: tocar numa cena do storyboard leva até ela', tAt >= sc30.t0 && tAt < sc30.t1, `t = ${tAt.toFixed(2)} s (cena ${sc30.t0.toFixed(2)}–${sc30.t1.toFixed(2)})`);
   await page.screenshot({ path: path.join(SHOTS, '02b-editor-30s.png'), fullPage: true });
   await page.click('label:has(input[name=dur][value="15"])');
-  await page.waitForFunction(() => document.querySelectorAll('#board .shot').length === 8, null, { timeout: 8000 }).catch(() => {});
-  check('volta para 15 s: painel escondido e 8 cenas', (await page.isHidden('#panel30')) && (await page.evaluate(() => document.querySelectorAll('#board .shot').length)) === 8 && nb(await page.textContent('[data-price-now]')) === 'R$ 29,90');
+  await page.waitForFunction(() => PulsoEditor.state.engine.DUR === 15 && document.querySelectorAll('#board .shot').length === PulsoEditor.state.engine.scenes.length, null, { timeout: 8000 }).catch(() => {});
+  const n15 = await page.evaluate(() => [document.querySelectorAll('#board .shot').length, PulsoEditor.state.engine.scenes.length, PulsoEditor.state.engine.DUR]);
+  check('volta para 15 s: painel escondido e cenas do vídeo curto', (await page.isHidden('#panel30')) && n15[0] === n15[1] && n15[1] >= 4 && n15[1] <= 8 && n15[2] === 15 && nb(await page.textContent('[data-price-now]')) === 'R$ 29,90', `${n15[1]} cenas`);
 
   // ── 3. compra: cadastro na janela, checkout, Pix aprovado, volta ao pedido
   await page.click('#buyBtn');
@@ -142,13 +153,15 @@ try {
   await ep.click('#aiBtn');
   await ep.waitForFunction(() => document.getElementById('f_hook1').value === 'COFFEE', null, { timeout: 15000 });
   check('EN: roteiro com IA pedido em inglês', mocks.log.includes('ai:en') && (await ep.inputValue('#f_product')) === 'House cappuccino');
-  await ep.click('label:has(input[name=motion][value="premium"])');
+  await ep.click('label:has(input[name=look][value="neon"])');
   await ep.click('label:has(input[name=dur][value="20"])');
   await ep.waitForTimeout(400);
-  check('EN: animação Premium escolhida na prévia', await ep.evaluate(() => PulsoEditor.state.engine.events.style === 'premium'));
+  const enLook = await ep.evaluate(() => [PulsoEditor.state.engine.plan.look, PulsoEditor.state.engine.DUR, PulsoEditor.state.engine.native, document.getElementById('dirName').textContent]);
+  check('EN: visual Neon escolhido na prévia (20 s no tempo real)', enLook[0] === 'neon' && enLook[1] === 20 && enLook[2] && /Neon night/.test(enLook[3]) && /Look:/.test(enLook[3]), enLook[3]);
   const enNow = await ep.evaluate(() => [...document.querySelectorAll('[data-price-now]')].map((e) => e.textContent.trim()));
   check('EN: escolher 20 s muda o preço e a prévia', (await ep.evaluate(() => PulsoEditor.state.dur)) === 20 && enNow.every((t) => t === 'US$ 12.90') && (await ep.textContent('#specPill')).startsWith('20 s'), enNow.join(' | '));
   await ep.screenshot({ path: path.join(SHOTS, '21-en-editor-20s.png') });
+  const enPreview = await ep.evaluate(() => PulsoEditor.state.engine.plan.scenes.map((s) => `${s.kind}:${s.variant}:${s.beats}`).join(' '));
   await ep.click('#buyBtn');
   await ep.waitForSelector('.modal form');
   check('EN: janela de cadastro em inglês', /Sign in|account/i.test(await ep.textContent('.modal')) && !/Criar conta|Senha/.test(await ep.textContent('.modal')));
@@ -189,7 +202,8 @@ try {
   check('ES: editor e IA em espanhol, 30 s a US$ 16.90', (await sp.getAttribute('html', 'lang')) === 'es' && mocks.log.includes('ai:es') && esNow.length > 0 && esNow.every((t) => t === 'US$ 16.90') && (await sp.inputValue('#f_s1')) === 'Elige tu café', esNow.join(' | '));
   const esBoard = await sp.evaluate(() => [...document.querySelectorAll('#board .shot small')].map((e) => e.textContent));
   const esPanel = await sp.textContent('#panel30');
-  check('ES: cenas extras e storyboard em espanhol, com depoimento', esBoard.length === 12 && esBoard.includes('En detalle') && esBoard.includes('Testimonio') && /Escenas del video de 30 s/.test(esPanel) && !/Depoimento|Imagem|Enviar/.test(esPanel), esBoard.join(', '));
+  const esScenes = await sp.evaluate(() => PulsoEditor.state.engine.scenes.map((s) => ({ key: s.key, t0: s.t0, t1: s.t1 })));
+  check('ES: cenas extras e storyboard em espanhol, com depoimento', esBoard.length === esScenes.length && esBoard.includes('En detalle') && esBoard.includes('Testimonio') && /Escenas del video de 30 s/.test(esPanel) && !/Depoimento|Imagem|Enviar/.test(esPanel), esBoard.join(', '));
   await sp.screenshot({ path: path.join(SHOTS, '22-es-editor-30s.png'), fullPage: true });
   await sp.click('#buyBtn');
   await sp.waitForSelector('.modal form');
@@ -248,7 +262,9 @@ try {
   const p20 = probe(mp20);
   check('EN: MP4 de 20 s, 1080x1920 + AAC', dl2.suggestedFilename() === 'pulso-bean-there-cafe.mp4' && p20.v && p20.v.width === 1080 && p20.a && Math.abs(p20.dur - 20) < 0.1, `${dl2.suggestedFilename()} · ${p20.dur.toFixed(2)} s · ${(p20.size / 1e6).toFixed(1)} MB`);
   const enSpec = await ep.evaluate(async (id) => (await (await fetch(`/api/orders/${id}/spec`)).json()).spec, enOrder);
-  check('EN: pedido guardou a animação Premium', enSpec.style.motion === 'premium' && enSpec.duration === 20 && enSpec.lang === 'en');
+  check('EN: pedido guardou a direção criativa (visual Neon e semente da prévia)', enSpec.creative && enSpec.creative.v === 2 && enSpec.creative.look === 'neon' && Number.isInteger(enSpec.creative.seed) && enSpec.duration === 20 && enSpec.lang === 'en', JSON.stringify({ ...enSpec.creative, plan: undefined }));
+  const enFrozen = enSpec.creative && enSpec.creative.plan ? enSpec.creative.plan.scenes.map((s) => `${s[0]}:${s[2]}:${s[3]}`).join(' ') : '';
+  check('EN: o plano da prévia foi congelado no pedido (render e correções repetem a mesma estrutura)', enFrozen && enFrozen === enPreview && enSpec.creative.plan.look === 'neon', enFrozen);
 
   // ── 4c. vídeo de 30 s em espanhol: duração, trilha nas cenas novas e quadros das cenas novas
   const t30 = Date.now();
@@ -261,7 +277,10 @@ try {
   const p30 = probe(mp30);
   check('ES: MP4 de 30 s, 1080x1920 + AAC', dl3.suggestedFilename() === 'pulso-cafe-la-esquina.mp4' && p30.v && p30.v.width === 1080 && p30.v.height === 1920 && p30.a && Math.abs(p30.dur - 30) < 0.1, `${dl3.suggestedFilename()} · ${p30.dur.toFixed(2)} s · ${(p30.size / 1e6).toFixed(1)} MB · ${((Date.now() - t30) / 1000).toFixed(0)} s de espera`);
   const vols = [[0.5, 6], [8, 3], [12, 2.5], [19.5, 2.5], [23, 3], [27, 2.5]].map(([s, d]) => loudness(mp30, s, d));
-  check('ES: trilha tocando em todas as partes, com respiro no depoimento', vols.every((v) => v > -32) && vols[3] < vols[4], vols.map((v) => v.toFixed(1)).join(' / ') + ' dB');
+  // a música recua no depoimento e volta na cena seguinte (tempos das cenas vêm do plano da prévia, que é o mesmo do render)
+  const qi = esScenes.findIndex((s) => s.key === 'quote'), q = esScenes[qi], qn = esScenes[qi + 1];
+  const vq = q ? loudness(mp30, q.t0 + 0.25, q.t1 - q.t0 - 0.5) : 0, vn = qn ? loudness(mp30, qn.t0 + 0.25, qn.t1 - qn.t0 - 0.5) : -99;
+  check('ES: trilha tocando em todas as partes, com respiro no depoimento', vols.every((v) => v > -32) && q && qn && vq < vn, vols.map((v) => v.toFixed(1)).join(' / ') + ` dB · depoimento ${vq.toFixed(1)} dB, seguinte ${vn.toFixed(1)} dB`);
   const frames = [9.5, 13.9, 20.5, 24.5].map((s) => { const f = path.join(SHOTS, `30-es-quadro-${String(s).replace('.', '_')}.jpg`); execFileSync('ffmpeg', ['-v', 'error', '-y', '-ss', String(s), '-i', mp30, '-frames:v', '1', '-vf', 'scale=540:-2', '-q:v', '3', f]); return fs.statSync(f).size; });
   check('ES: cenas novas com conteúdo (fotos, passos, depoimento, frase final)', frames.every((n) => n > 14000), frames.map((n) => `${Math.round(n / 1000)} KB`).join(' / '));
 

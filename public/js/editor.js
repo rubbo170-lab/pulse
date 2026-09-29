@@ -134,9 +134,24 @@
   const STEPS = STEPS_ALL[LANG] || STEPS_ALL.pt;
 
   const DRAFT_KEY = `pulso.draft.v3.${LANG}`;
-  const state = { engine: null, images: { logo: null, product: null }, gallery: [null, null, null], audio: null, audioKey: '', audioReady: false, playing: true, t: 0, lastNow: null, dirty: true, soundOn: false, actx: null, src: null, startAt: 0, scale: 0.5, ft: [], revise: null, busy: false, aiEnabled: true, dur: 15 };
+  const state = { engine: null, images: { logo: null, product: null }, gallery: [null, null, null], audio: null, audioKey: '', audioReady: false, playing: true, t: 0, lastNow: null, dirty: true, soundOn: false, actx: null, src: null, startAt: 0, scale: 0.5, ft: [], revise: null, busy: false, aiEnabled: true, dur: 15,
+    creative: null, motion: 'dinamico' };
   const pv = $('pv');
-  const K = () => (state.dur === 20 ? 20 / 15 : 1); // 20 s = mesma animação 4/3 mais lenta; 30 s tem cenas próprias
+  // motor criativo: cada duração tem o próprio plano (tempo real). Motor antigo (vídeos já pagos): 20 s = animação de 15 s 4/3 mais lenta
+  const K = () => (state.engine && state.engine.native ? 1 : state.dur === 20 ? 20 / 15 : 1);
+  const STUDIO = typeof PulsoStudio !== 'undefined';
+  // miniatura de cada visual no seletor (as cores reais saem da marca)
+  const LOOK_SWATCH = {
+    auto: ['conic-gradient(from 200deg, #ff5c8a, #ffc46b, #3ddc97, #3aa0ff, #7c5cff, #ff5c8a)', '#ffffff', "800 18px 'Bricolage Grotesque'", '?'],
+    pop: ['radial-gradient(circle at 18% 30%, #ffd23f 0 16%, transparent 17%), radial-gradient(circle at 84% 70%, #3ddc97 0 14%, transparent 15%), #ffd9e6', '#e8336d', "700 18px 'Fredoka'", 'Aa'],
+    bold: ['linear-gradient(115deg, #0e0d12 0 62%, #ff5a1f 62% 74%, #0e0d12 74%)', '#ffffff', "400 19px 'Anton'", 'AA'],
+    editorial: ['linear-gradient(transparent 76%, #1b1712 76% 79%, transparent 79%), #f4ecdf', '#1b1712', "italic 400 19px 'DM Serif Display'", 'Aa'],
+    neon: ['radial-gradient(circle at 50% 130%, #ff2e88 0 30%, transparent 60%), linear-gradient(#07060c, #1a0b1f)', '#ffd6ea', "800 15px 'Unbounded'", 'Aa'],
+    clean: ['radial-gradient(circle at 85% 15%, #c9bcff 0 22%, transparent 60%), #f6f5fb', '#221e29', "800 18px 'Bricolage Grotesque'", 'Aa'],
+    retro: ['radial-gradient(circle at 50% 125%, #ff8a3d 0 45%, transparent 46%), linear-gradient(#fbe9cf, #f7c8a0)', '#7a2a12', "400 18px 'Righteous'", 'Aa'],
+    grid: ['linear-gradient(90deg, rgba(0,0,0,.14) 1px, transparent 1px) 0 0/9px 9px, linear-gradient(rgba(0,0,0,.14) 1px, transparent 1px) 0 0/9px 9px, #f2f2f2', '#111111', "400 17px 'Archivo Black'", 'AA'],
+    organic: ['radial-gradient(circle at 20% 75%, #9ad0b0 0 24%, transparent 25%), radial-gradient(circle at 82% 25%, #f7a98b 0 22%, transparent 23%), #fbe7dc', '#3b2a22', "900 18px 'Fraunces'", 'Aa'],
+  };
 
   // ── formulário
   function readForm() {
@@ -144,13 +159,18 @@
     TEXT_IDS.forEach((k) => { f[k] = $(k).value; });
     f.style = (document.querySelector('input[name=style]:checked') || {}).value || 'moderno';
     f.mood = (document.querySelector('input[name=mood]:checked') || {}).value || 'energia';
-    f.motion = (document.querySelector('input[name=motion]:checked') || {}).value || 'dinamico';
+    f.motion = (document.querySelector('input[name=motion]:checked') || {}).value || state.motion || 'dinamico';
+    f.creative = state.creative || null;
     f.dur = (document.querySelector('input[name=dur]:checked') || {}).value || '15';
     return f;
   }
   function writeForm(f) {
     TEXT_IDS.forEach((k) => { if (f[k] != null) $(k).value = f[k]; });
     for (const n of ['style', 'mood', 'motion', 'dur']) { const el = document.querySelector(`input[name=${n}][value="${f[n]}"]`); if (el) el.checked = true; }
+    state.motion = f.motion || 'dinamico';
+    // direção criativa: a do rascunho ou do pedido; vídeo novo ganha uma semente nova. Correção de vídeo do motor antigo fica sem.
+    state.creative = !STUDIO ? null : f.creative ? PulsoStudio.cleanCreative(f.creative) : state.revise ? null : PulsoStudio.newCreative();
+    paintLooks();
     updateCounters(); $('c1v').textContent = $('f_c1').value.toUpperCase(); $('c2v').textContent = $('f_c2').value.toUpperCase();
     setDuration(durOf(f.dur));
   }
@@ -166,6 +186,7 @@
         showcaseTitle: f.f_showTitle.trim(), stepsTitle: f.f_stepsTitle.trim(), steps },
       proof: { rating: f.f_rating.trim(), ratingSource: f.f_ratingSrc.trim(), customers: f.f_customers.trim(), customersLabel: f.f_customersLabel.trim(), quote: f.f_quote.replace(/\s+/g, ' ').trim(), author: f.f_author.trim() },
       contact: { whatsapp: f.f_whats.trim(), instagram: f.f_insta.trim(), site: f.f_site.trim(), address: f.f_addr.trim() },
+      ...(f.creative ? { creative: f.creative } : {}),
     };
   }
   function specToForm(s) {
@@ -178,6 +199,7 @@
     f.f_rating = s.proof.rating; f.f_ratingSrc = s.proof.ratingSource; f.f_customers = s.proof.customers; f.f_customersLabel = s.proof.customersLabel;
     f.f_quote = s.proof.quote || ''; f.f_author = s.proof.author || '';
     f.f_whats = s.contact.whatsapp; f.f_insta = s.contact.instagram; f.f_site = s.contact.site; f.f_addr = s.contact.address;
+    f.creative = s.creative || null;
     return f;
   }
   function updateCounters() {
@@ -209,11 +231,15 @@
       const spec = toSpec(readForm());
       if (!spec.brand.name) spec.brand.name = T('Sua Empresa');
       state.engine = Pulso.create(spec, { ...state.images, gallery: state.gallery.filter(Boolean) }); state.dirty = true;
-      buildTimeline(); scheduleBoard();
+      buildTimeline(); scheduleBoard(); paintDirection();
       scheduleAudio();
     } catch (e) { console.error(e); setStatus(T('A prévia falhou ao montar. Revise os textos e tente de novo.'), 'err'); }
   }
-  function audioKey() { const e = state.engine.events; return JSON.stringify([e.mood, e.style, e.typeChars, e.variant, e.benefitsN, e.contactRows, e.hasOffer, state.dur, e.ch30]); }
+  function audioKey() {
+    const e = state.engine.events;
+    if (e.v === 2) return JSON.stringify([2, e.seed, e.look, e.genre, e.bpm, e.dur, e.mood, e.scenes.map((s) => [s.variant, s.t0.toFixed(3), (s.hits || []).map((h) => h[0].toFixed(2)).join(','), s.typing ? s.typing.n : 0]), e.trans.map((t) => t.kind)]);
+    return JSON.stringify([e.mood, e.style, e.typeChars, e.variant, e.benefitsN, e.contactRows, e.hasOffer, state.dur, e.ch30]);
+  }
   function scheduleAudio(force) { if (!state.engine) return; const k = audioKey(); if (!force && k === state.audioKey) return; state.audioReady = false; clearTimeout(audioTimer); audioTimer = setTimeout(() => renderAudio(k), 650); }
   async function renderAudio(k) {
     const v = ++audioVersion; soundLabel();
@@ -233,6 +259,36 @@
     state.actx.resume();
     const src = state.actx.createBufferSource(); src.buffer = state.audio; src.loop = true; src.connect(state.actx.destination);
     const t = ((state.t % state.dur) + state.dur) % state.dur; src.start(0, Math.min(t, state.audio.duration - 0.01)); state.src = src; state.startAt = state.actx.currentTime - t;
+  }
+
+  // ── visual do vídeo (motor criativo): escolha do visual e "Outro visual" (nova semente: cenas, transições e música novas)
+  function buildLooks() {
+    if (!STUDIO) { $('lookBox').hidden = true; return; }
+    const list = [['auto', T('Surpresa')], ...PulsoStudio.lookList(LANG).map((l) => [l.id, l.name])];
+    $('looks').innerHTML = list.map(([id, name]) => { const [bg, fg, font, txt] = LOOK_SWATCH[id] || LOOK_SWATCH.auto; return `<label class="look"><input type="radio" name="look" value="${id}"><span><i style="background:${bg};color:${fg};font:${font}">${txt}</i>${Site.esc(name)}</span></label>`; }).join('');
+  }
+  function paintLooks() {
+    if (!STUDIO) return;
+    const on = !!state.creative;
+    $('lookBox').hidden = !on;
+    if (!on) return;
+    const el = document.querySelector(`input[name=look][value="${state.creative.look}"]`); if (el) el.checked = true;
+  }
+  function setLook(id) {
+    if (!state.creative) return;
+    state.creative = PulsoStudio.cleanCreative({ ...state.creative, look: id, plan: null });
+    saveDraft(); rebuild(); seek(0); setPlaying(true);
+  }
+  function shuffle() {
+    if (!state.creative) return;
+    state.creative = PulsoStudio.newCreative(state.creative, { keepLook: true });
+    saveDraft(); rebuild(); seek(0); setPlaying(true);
+  }
+  function paintDirection() {
+    const E = state.engine, box = $('direction');
+    if (!E || !E.native) { box.hidden = true; return; }
+    box.hidden = false;
+    $('dirName').innerHTML = Site.esc(T('Visual:')) + ` <b>${Site.esc(E.lookName)}</b> · ` + Site.esc(E.arcName);
   }
 
   // ── prévia (sempre com a marca PRÉVIA; o vídeo em alta sai do servidor depois do pagamento)
@@ -371,6 +427,8 @@
     $('aiBtn').disabled = true; status(T('Escrevendo o roteiro…'));
     try {
       const r = await Site.api('/api/ai/script', { method: 'POST', body: { brief } });
+      // a IA também sugere o visual (se o cliente deixou na surpresa) e a palavra de destaque de cada frase
+      if (state.creative && r.script) state.creative = PulsoStudio.cleanCreative({ ...state.creative, keys: r.script.emphasis || {}, pref: state.creative.look === 'auto' && r.script.look ? r.script.look : state.creative.pref });
       applyScript(sanitize(r.script || {}, f)); status(T('Roteiro pronto. Edite o que quiser.'));
     } catch (e) {
       if (e.status === 429 && e.data && e.data.needLogin) {
@@ -476,9 +534,16 @@
     if (Object.values(EXAMPLES).some((ex) => ex.f_name === readForm().f_name.trim())) return [T('Troque o exemplo pelos dados da sua empresa antes de comprar.'), 'f_name'];
     return null;
   }
+  // o plano da prévia vai junto no pedido: o vídeo em alta (e uma correção futura) repete exatamente esta estrutura
+  function withPlan(spec) {
+    if (!spec.creative || !STUDIO) return spec;
+    rebuild(); // monta a prévia com o texto de agora (sem esperar o intervalo da digitação)
+    const E = state.engine;
+    return E && E.native && E.plan ? { ...spec, creative: { ...spec.creative, plan: PulsoStudio.freezePlan(E.plan) } } : spec;
+  }
   async function buy() {
     if (state.busy) return;
-    const f = readForm(), spec = toSpec(f), p = problem(spec);
+    const f = readForm(), spec = withPlan(toSpec(f)), p = problem(spec);
     if (p) { setStatus(p[0], 'err'); Site.toast(p[0], true); $(p[1]).focus(); $(p[1]).scrollIntoView({ block: 'center', behavior: 'smooth' }); return; }
     try { await Site.ensureLogin({ title: T('Falta pouco!'), sub: T('Crie sua conta para pagar e receber o vídeo. Ele fica salvo em Meus vídeos.') }); }
     catch { return; }
@@ -523,7 +588,7 @@
   async function submitRevise() {
     if (state.busy) return;
     const f = readForm(); f.f_name = state.revise.brand;
-    const spec = toSpec(f), p = problem(spec);
+    const spec = withPlan(toSpec(f)), p = problem(spec);
     if (p && p[1] !== 'f_name') { setStatus(p[0], 'err', 'reviseStatus'); $(p[1]).focus(); return; }
     state.busy = true; $('reviseBtn').disabled = true; setStatus(T('Enviando a correção…'), '', 'reviseStatus');
     try { await Site.api(`/api/orders/${state.revise.id}/revise`, { method: 'POST', body: { spec } }); location.href = `${P('order')}/${state.revise.id}`; }
@@ -566,6 +631,7 @@
   function buildForm() {
     $('f_segment').innerHTML = SEGMENTS.map((s) => `<option value="${s}">${Site.esc(T(s))}</option>`).join('');
     const opts = PU.ICON_LIST.map((k) => `<option value="${k}">${Site.esc(T(ICON_LABELS[k] || k))}</option>`).join('');
+    buildLooks();
     $('bens').innerHTML = [1, 2, 3, 4].map((i) => `<div class="ben"><label class="fld"><span>${Site.esc(T('Vantagem {n}', { n: i }))}${i === 4 ? ' ' + Site.esc(T('(opcional)')) : ''} <i data-count="f_b${i}"></i></span><input type="text" id="f_b${i}" maxlength="30"></label><label class="fld"><span>${Site.esc(T('Ícone'))}</span><select id="f_i${i}">${opts}</select></label></div>`).join('');
     $('stepsBox').innerHTML = [1, 2, 3].map((i) => `<div class="ben"><label class="fld"><span>${Site.esc(T('Passo {n}', { n: i }))} <i data-count="f_s${i}"></i></span><input type="text" id="f_s${i}" maxlength="24"></label><label class="fld"><span>${Site.esc(T('Ícone'))}</span><select id="f_si${i}">${opts}</select></label></div>`).join('');
   }
@@ -575,6 +641,7 @@
       if (id === 'f_c1') $('c1v').textContent = e.target.value.toUpperCase();
       if (id === 'f_c2') $('c2v').textContent = e.target.value.toUpperCase();
       if (e.target.name === 'dur') setDuration(durOf(e.target.value));
+      if (e.target.name === 'look') { if (e.type === 'change') setLook(e.target.value); return; }
       if (id === 'f_name' && !state.exCleared && e.target.value.trim() !== EXAMPLE.f_name) {
         // os dados de contato, oferta e avaliação do exemplo fictício nunca podem ir para o vídeo de uma empresa real
         state.exCleared = true;
@@ -594,8 +661,9 @@
     tl.addEventListener('pointerdown', (e) => { drag = true; tl.setPointerCapture(e.pointerId); seek(pos(e)); });
     tl.addEventListener('pointermove', (e) => { if (drag) seek(pos(e)); });
     tl.addEventListener('pointerup', () => { drag = false; });
-    tl.addEventListener('keydown', (e) => { const step = 0.46875 * K(); if (e.key === 'ArrowRight') { seek(state.t + step); e.preventDefault(); } else if (e.key === 'ArrowLeft') { seek(state.t - step); e.preventDefault(); } else if (e.key === ' ') { setPlaying(!state.playing); e.preventDefault(); } });
+    tl.addEventListener('keydown', (e) => { const step = state.engine && state.engine.plan ? state.engine.plan.beat : 0.46875 * K(); if (e.key === 'ArrowRight') { seek(state.t + step); e.preventDefault(); } else if (e.key === 'ArrowLeft') { seek(state.t - step); e.preventDefault(); } else if (e.key === ' ') { setPlaying(!state.playing); e.preventDefault(); } });
     $('aiBtn').addEventListener('click', writeScript);
+    $('shuffleBtn').addEventListener('click', shuffle);
     $('buyBtn').addEventListener('click', buy);
     $('mbarBtn').addEventListener('click', buy);
     $('reviseBtn').addEventListener('click', submitRevise);
@@ -614,7 +682,7 @@
   }
   async function fonts() {
     const faces = ["800 40px 'Bricolage Grotesque'", "800 40px 'Big Shoulders Display'", "400 40px 'Gloock'", "400 40px 'Instrument Sans'", "600 40px 'Instrument Sans'", "700 40px 'Instrument Sans'", "400 40px 'IBM Plex Mono'", "500 40px 'IBM Plex Mono'", "700 40px 'IBM Plex Mono'"];
-    try { await Promise.race([Promise.all(faces.map((f) => document.fonts.load(f))), new Promise((r) => setTimeout(r, 5000))]); } catch { /* usa fontes do sistema */ }
+    try { await Promise.race([Promise.all([...faces.map((f) => document.fonts.load(f)), STUDIO ? PulsoStudio.ready('/fonts/') : null]), new Promise((r) => setTimeout(r, 5000))]); } catch { /* usa fontes do sistema */ }
   }
 
   async function start() {

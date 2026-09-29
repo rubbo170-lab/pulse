@@ -66,10 +66,10 @@
           <div class="swatch"><input type="color" id="f_c2" aria-label="Cor de destaque"><label for="f_c2">Destaque<code id="c2v"></code></label></div>
           <button class="btn small" id="logoColors" type="button" hidden>Usar cores do logo</button>
         </div>
-        <div class="sub">Animação</div>
-        <div class="choices two" role="radiogroup" aria-label="Animação">
-          <label class="choice moods"><input type="radio" name="motion" value="dinamico" checked><span><b>Dinâmico</b><small>Impacto, brilho e cortes rápidos</small></span></label>
-          <label class="choice moods"><input type="radio" name="motion" value="premium"><span><b>Premium</b><small>Limpo e elegante, palavra por palavra</small></span></label>
+        <div id="lookBox">
+          <div class="sub">Visual do vídeo</div>
+          <p class="hint">Cada vídeo nasce com direção de arte, cenas, transições e música próprias. Escolha um visual ou deixe na surpresa.</p>
+          <div class="looks" id="looks" role="radiogroup" aria-label="Visual do vídeo"></div>
         </div>
         <div class="sub">Estilo das letras</div>
         <div class="choices" role="radiogroup" aria-label="Estilo das letras">
@@ -115,7 +115,7 @@
       <article class="panel" id="panel30" aria-labelledby="h4" hidden>
         <header><span class="num">04</span><h2 id="h4">Cenas do vídeo de 30 s</h2></header>
         <div class="sub">Fotos e prints (até 3)</div>
-        <p class="hint">Cardápio, produtos, site, app ou Instagram. No vídeo, cada imagem vira peças que se montam, com zoom na parte principal.</p>
+        <p class="hint">Cardápio, produtos, site, app ou Instagram. No vídeo, suas imagens aparecem em destaque, com movimento.</p>
         <div class="uploads three">
           <div class="drop" id="d_g0"><div class="thumb" id="t_g0"></div><div class="meta"><b>Imagem 1</b><small id="n_g0">A principal</small></div><button class="btn small x" id="x_g0" type="button" hidden>Remover</button><input type="file" id="f_g0" accept="image/png,image/jpeg,image/webp" aria-label="Enviar imagem 1"></div>
           <div class="drop" id="d_g1"><div class="thumb" id="t_g1"></div><div class="meta"><b>Imagem 2</b><small id="n_g1">Opcional</small></div><button class="btn small x" id="x_g1" type="button" hidden>Remover</button><input type="file" id="f_g1" accept="image/png,image/jpeg,image/webp" aria-label="Enviar imagem 2"></div>
@@ -144,6 +144,10 @@
       </div>
       <div class="timeline" id="tl" role="slider" aria-label="Posição no vídeo" aria-valuemin="0" aria-valuemax="15" aria-valuenow="0" tabindex="0"><div class="playhead" id="ph"></div></div>
       <div class="scene" id="sceneName">Cena: <b>Gancho</b></div>
+      <div class="direction" id="direction" hidden>
+        <span class="dir-name" id="dirName"></span>
+        <button class="btn small" id="shuffleBtn" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="3.5" width="17" height="17" rx="4" fill="none" stroke="currentColor" stroke-width="1.8"/><circle cx="8.5" cy="8.5" r="1.5" fill="currentColor"/><circle cx="15.5" cy="15.5" r="1.5" fill="currentColor"/><circle cx="12" cy="12" r="1.5" fill="currentColor"/><circle cx="15.5" cy="8.5" r="1.5" fill="currentColor"/><circle cx="8.5" cy="15.5" r="1.5" fill="currentColor"/></svg><span>Outro visual</span></button>
+      </div>
       <div class="board" id="board" aria-label="Storyboard: toque numa cena para ir até ela"></div>
 
       <div class="buy" id="buyBox">
@@ -170,6 +174,10 @@
 <script src="/js/engine_util.js"></script>
 <script src="/js/engine.js"></script>
 <script src="/js/audio.js"></script>
+<script src="/js/studio_kit.js"></script>
+<script src="/js/studio_scenes.js"></script>
+<script src="/js/studio.js"></script>
+<script src="/js/studio_audio.js"></script>
 <script src="/js/editor.js"></script>
 </body>
 </html>

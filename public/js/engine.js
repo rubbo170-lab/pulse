@@ -89,6 +89,8 @@ const Pulso = (() => {
   }
 
   function create(specIn, images = {}) {
+    // pedidos novos trazem a direção criativa (v2) e usam o motor criativo; os já pagos continuam neste motor
+    if (typeof PulsoStudio !== 'undefined' && PulsoStudio.isStudio(specIn)) return PulsoStudio.create(specIn, images);
     const spec = normalize(specIn);
     const T = makeTheme(spec.colors.primary, spec.colors.secondary);
     const F = FONTS[spec.style.font] || FONTS.moderno;

@@ -113,3 +113,17 @@
 .board .shot small { font-size: 9.5px; text-align: center; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .board .shot.cur canvas { border-color: var(--beat); box-shadow: 0 0 0 1px var(--beat); }
 .board .shot.cur small { color: var(--beat); }
+
+/* visual do vídeo (motor criativo) */
+.looks { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+@media (min-width: 560px) { .looks { grid-template-columns: repeat(5, minmax(0, 1fr)); } }
+.look { position: relative; }
+.look input { position: absolute; opacity: 0; }
+.look span { display: flex; flex-direction: column; gap: 6px; padding: 8px; border-radius: 12px; border: 1px solid var(--line); background: var(--field); cursor: pointer; height: 100%; font-size: 12px; line-height: 1.25; color: var(--muted); }
+.look span i { display: flex; align-items: center; justify-content: center; height: 34px; border-radius: 8px; border: 1px solid rgba(255, 255, 255, 0.08); font-style: normal; line-height: 1; letter-spacing: 0; overflow: hidden; }
+.look input:checked + span { border-color: var(--accent); color: var(--text); background: color-mix(in srgb, var(--accent) 12%, var(--field)); }
+.look input:focus-visible + span { outline: 2px solid var(--accent-hi); outline-offset: 2px; }
+.direction { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; font-size: 13px; color: var(--muted); }
+.direction .dir-name { flex: 1; min-width: 0; }
+.direction .dir-name b { color: var(--text); font-weight: 600; }
+.direction .btn svg { width: 18px; height: 18px; }

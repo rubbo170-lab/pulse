@@ -51,6 +51,9 @@ try {
     // versão leve para a web (720p, mesma fluidez)
     execFileSync('ffmpeg', ['-hide_banner', '-loglevel', 'error', '-y', '-i', full, '-vf', 'scale=720:1280:flags=lanczos', '-c:v', 'libx264', '-preset', 'slow', '-crf', '24', '-maxrate', '3500k', '-bufsize', '7000k', '-profile:v', 'high', '-pix_fmt', 'yuv420p',
       '-colorspace', 'bt709', '-color_primaries', 'bt709', '-color_trc', 'bt709', '-c:a', 'aac', '-b:a', '128k', '-movflags', '+faststart', path.join(OUT, `exemplo-${name}.mp4`)]);
-    execFileSync('ffmpeg', ['-hide_banner', '-loglevel', 'error', '-y', '-ss', process.env[`POSTER_${name}`] || '6.9', '-i', full, '-frames:v', '1', '-vf', 'scale=720:1280:flags=lanczos', '-q:v', '3', path.join(OUT, `exemplo-${name}.jpg`)]);
+    // pôster: a capa que o próprio render escolheu (motor criativo: o quadro do produto), ou um instante fixo (POSTER_nome=6.9)
+    const cv = process.env[`POSTER_${name}`] ? null : await fetch(`${BASE}/api/orders/${ids[name]}/cover`, { headers: { cookie } });
+    if (cv && cv.ok) { const cf = path.join(DATA, `${name}-capa.jpg`); fs.writeFileSync(cf, Buffer.from(await cv.arrayBuffer())); execFileSync('ffmpeg', ['-hide_banner', '-loglevel', 'error', '-y', '-i', cf, '-vf', 'scale=720:1280:flags=lanczos', '-q:v', '3', path.join(OUT, `exemplo-${name}.jpg`)]); }
+    else execFileSync('ffmpeg', ['-hide_banner', '-loglevel', 'error', '-y', '-ss', process.env[`POSTER_${name}`] || '6.9', '-i', full, '-frames:v', '1', '-vf', 'scale=720:1280:flags=lanczos', '-q:v', '3', path.join(OUT, `exemplo-${name}.jpg`)]);
   }
 } finally { srv.kill('SIGTERM'); }

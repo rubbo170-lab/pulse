@@ -195,6 +195,8 @@ const PulsoAudio = (() => {
   }
 
   async function render(ev, opts = {}) {
+    // motor criativo (Pulso Studio): trilha composta a partir do plano de cada vídeo
+    if (ev && ev.v === 2 && typeof PulsoStudioAudio !== 'undefined') return PulsoStudioAudio.render(ev, opts);
     if (ev.dur === 30) return render30(ev, opts);
     const k = opts.scale && opts.scale > 0 ? opts.scale : 1;
     return master(await score(ev, opts), Math.floor(SR * T15 * k));
@@ -540,5 +542,5 @@ const PulsoAudio = (() => {
     let o = 44; for (let i = 0; i < n; i++) for (let c = 0; c < ch; c++) { v.setInt16(o, Math.max(-1, Math.min(1, data[c][i])) * 32767, true); o += 2; }
     return new Uint8Array(buf);
   }
-  return { render, toWav, SR };
+  return { render, toWav, SR, _: { instruments, makeKit, buses, master, mtof, rngf } };
 })();
