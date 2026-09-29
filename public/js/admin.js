@@ -26,11 +26,11 @@
     const c = s.config, chip = (ok, txt, cls) => `<span class="chip ${cls || (ok ? 'ok' : 'err')}">${E(txt)}</span>`;
     const p = c.prices || {};
     $('cfg').innerHTML = chip(c.paymentsBRL, c.paymentsBRL ? 'Reais: Mercado Pago ligado' : 'Reais desligado (MP_ACCESS_TOKEN)')
-      + (c.sandbox ? chip(false, 'Mercado Pago em modo teste', 'warn') : '')
+      + (c.sandbox ? chip(false, c.testOpen ? 'Mercado Pago em modo teste' : 'Mercado Pago em modo teste: só os seus pedidos pagam', 'warn') : '')
       + chip(c.webhookSecret, c.webhookSecret ? 'Aviso do Mercado Pago com assinatura' : 'Sem MP_WEBHOOK_SECRET', c.webhookSecret ? 'ok' : 'warn')
       + chip(c.paymentsUSD, c.paymentsUSD ? 'Dólar: Stripe ligado' : 'Dólar desligado (STRIPE_SECRET_KEY)')
       + (c.paymentsUSD ? chip(c.stripeWebhook, c.stripeWebhook ? 'Aviso do Stripe com assinatura' : 'Falta STRIPE_WEBHOOK_SECRET') : '')
-      + (c.paymentsUSD && c.stripeTest ? chip(false, 'Stripe em modo teste', 'warn') : '')
+      + (c.paymentsUSD && c.stripeTest ? chip(false, c.testOpen ? 'Stripe em modo teste' : 'Stripe em modo teste: só os seus pedidos pagam (clientes veem "abre em breve")', 'warn') : '')
       + (c.paymentsUSD ? chip(true, `Stripe: ${c.stripeInvoices ? 'fatura por e-mail' : 'sem fatura'} · ${c.stripeTax === 'on' ? 'imposto automático' : 'sem imposto automático'}`) : '')
       + (c.paymentsUSD && c.stripeTax === 'blocked' ? chip(false, 'Stripe recusou o imposto automático (conta sem Stripe Tax): vendas seguem sem ele; deixe STRIPE_TAX=0', 'warn') : '')
       + chip(c.aiEnabled, c.aiEnabled ? 'IA ligada' : 'IA desligada (ANTHROPIC_API_KEY)')

@@ -2,7 +2,7 @@
 import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
-import { config, ROOT, paymentsReady, aiReady, currencyFor, priceFor, LANGS, DURATIONS } from './lib/config.js';
+import { config, ROOT, paymentsReady, checkoutOpen, aiReady, currencyFor, priceFor, LANGS, DURATIONS } from './lib/config.js';
 import { db, q, tx, now, logEvent } from './lib/db.js';
 import { createRouter, json, readJson, readBody, fail, HttpError, sendFile, safeJoin, securityHeaders, clientIp, redirect } from './lib/http.js';
 import * as Auth from './lib/auth.js';
@@ -28,7 +28,7 @@ api.get('/api/config', (req, res, { query }) => {
   const lang = LANGS.includes(query.get('lang')) ? query.get('lang') : 'pt', currency = currencyFor(lang);
   json(res, 200, {
     brand: config.brandName, lang, currency, prices: Object.fromEntries(DURATIONS.map((d) => [d, priceFor(currency, d)])), durations: DURATIONS,
-    editsIncluded: config.editsIncluded, retentionDays: config.retentionDays, paymentsEnabled: paymentsReady(currency), aiEnabled: aiReady(),
+    editsIncluded: config.editsIncluded, retentionDays: config.retentionDays, paymentsEnabled: checkoutOpen(currency, Auth.isAdmin(Auth.currentUser(req))), aiEnabled: aiReady(),
     company: { name: config.company.name, doc: config.company.doc, email: config.company.email, whatsapp: config.company.whatsapp, city: config.company.city },
   });
 });
@@ -138,7 +138,9 @@ api.del('/api/brand', (req, res) => {
 
 // ── pedidos
 function orderView(o) {
-  return Orders.publicOrder(o, { queue: queueInfo(o), checkoutReady: o.status === 'awaiting_payment' && paymentsReady(o.currency) });
+  const unpaid = o.status === 'awaiting_payment' || o.status === 'expired';
+  // paymentsOpen: falso enquanto o pagamento desta moeda não abriu para o cliente (sem chave, ou chave de teste em produção)
+  return Orders.publicOrder(o, { queue: queueInfo(o), checkoutReady: o.status === 'awaiting_payment' && paymentsReady(o.currency), ...(unpaid ? { paymentsOpen: Orders.paymentsOpenFor(o) } : {}) });
 }
 
 api.post('/api/orders', async (req, res) => {
@@ -335,7 +337,7 @@ api.get('/api/admin/summary', async (req, res) => {
     renderAvgMs: render.avg ? Math.round(render.avg) : null, aiToday: q('SELECT COUNT(*) AS n FROM ai_calls WHERE at > ?').get(since(1)).n,
     freeMB: Math.round(Math.min(Orders.freeBytes(), 1e15) / 1e6),
     alerts: q(`SELECT kind, order_id, detail, at FROM events WHERE kind IN ('payment.duplicate', 'payment.mismatch', 'render.failed', 'webhook.bad_signature', 'disk.low') AND at > ? ORDER BY at DESC LIMIT 20`).all(since(14)),
-    config: { paymentsBRL: paymentsReady('BRL'), paymentsUSD: paymentsReady('USD'), stripeWebhook: !!config.stripe.webhookSecret, stripeTest: ST.isTestKey(), stripeInvoices: config.stripe.invoices, stripeTax: ST.taxStatus(),aiEnabled: aiReady(), webhookSecret: !!config.mp.webhookSecret, sandbox: config.mp.sandbox, prices: config.prices, appUrl: config.appUrl, fps: config.render.fps },
+    config: { paymentsBRL: paymentsReady('BRL'), paymentsUSD: paymentsReady('USD'), stripeWebhook: !!config.stripe.webhookSecret, stripeTest: ST.isTestKey(), testOpen: config.testPaymentsOpen, stripeInvoices: config.stripe.invoices, stripeTax: ST.taxStatus(),aiEnabled: aiReady(), webhookSecret: !!config.mp.webhookSecret, sandbox: config.mp.sandbox, prices: config.prices, appUrl: config.appUrl, fps: config.render.fps },
   });
 });
 
@@ -499,6 +501,7 @@ server.listen(config.port, async () => {
   if (!config.admins.length || !config.adminToken) missing.push('ADMIN_EMAILS e ADMIN_TOKEN (painel /admin)');
   if (missing.length) console.log('[pulso] faltando: ' + missing.join('; '));
   if (config.mp.sandbox) console.log('[pulso] Mercado Pago em modo de TESTE');
+  for (const cur of ['BRL', 'USD']) if (paymentsReady(cur) && !checkoutOpen(cur)) console.log(`[pulso] ${cur}: chave de teste em produção; só os pedidos do dono pagam (TEST_PAYMENTS=open libera para todos)`);
   await startWorker();
   const housekeeping = () => { try { Auth.cleanupSessions(); cleanupFiles(); } catch (e) { console.error('[pulso] limpeza falhou', e.message); } };
   housekeeping();

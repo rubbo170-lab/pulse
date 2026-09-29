@@ -41,9 +41,14 @@
         const pending = returnStatus === 'pending' || returnStatus === 'in_process';
         track('pay', -1);
         $('oTitle').textContent = pending ? T('Esperando o pagamento cair') : o.status === 'expired' ? T('Este pedido ficou sem pagamento') : T('Falta só o pagamento');
-        $('oText').textContent = pending ? T('Assim que o pagamento for confirmado, seu vídeo começa a ser gerado. Pode deixar esta página aberta.') : returnStatus === 'canceled' ? T('O pagamento foi cancelado. Você pode tentar de novo quando quiser.') : T('Pague com Pix ou cartão pelo Mercado Pago. O vídeo começa a ser gerado assim que o pagamento for aprovado.');
-        actions(`<button class="btn primary big" id="payBtn" type="button">${Site.esc(T('Pagar {price}', { price: Site.fmtMoney(o.priceCents, o.currency) }))}</button><a class="btn ghost big" href="${P('create')}">${Site.esc(T('Voltar e editar'))}</a>`);
-        $('payBtn').addEventListener('click', pay);
+        // pagamento desta moeda ainda fechado ao público (loja em modo de teste): o pedido fica guardado
+        const closed = o.paymentsOpen === false && !pending;
+        $('oText').textContent = closed ? T('O pagamento abre em breve. Seu pedido ficou salvo em Meus vídeos: é só voltar aqui para pagar.') : pending ? T('Assim que o pagamento for confirmado, seu vídeo começa a ser gerado. Pode deixar esta página aberta.') : returnStatus === 'canceled' ? T('O pagamento foi cancelado. Você pode tentar de novo quando quiser.') : T('Pague com Pix ou cartão pelo Mercado Pago. O vídeo começa a ser gerado assim que o pagamento for aprovado.');
+        if (closed) actions(`${support()}<a class="btn ghost big" href="${P('create')}">${Site.esc(T('Voltar e editar'))}</a>`);
+        else {
+          actions(`<button class="btn primary big" id="payBtn" type="button">${Site.esc(T('Pagar {price}', { price: Site.fmtMoney(o.priceCents, o.currency) }))}</button><a class="btn ghost big" href="${P('create')}">${Site.esc(T('Voltar e editar'))}</a>`);
+          $('payBtn').addEventListener('click', pay);
+        }
         waiting(pending ? T('Aguardando a confirmação do pagamento') : T('Aguardando pagamento'));
         break;
       }

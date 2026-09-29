@@ -77,7 +77,7 @@ Nenhuma delas exige código: é só copiar as chaves para as variáveis do Railw
 
 ## Mercado Pago (reais)
 
-- **Credenciais:** *Suas integrações* → sua aplicação (produto Checkout Pro) → *Credenciais de produção* → **Access Token**. O Mercado Pago pode pedir alguns dados do negócio para ativar as credenciais de produção.
+- **Credenciais:** *Suas integrações* → sua aplicação (produto Checkout Pro) → *Produção* → *Credenciais de produção* → **Access Token**. Para ativar, o Mercado Pago pede o setor, o site (`https://pulso.mgrservicosdigitais.com.br`), o aceite dos termos e um reCAPTCHA. Não copie as *Credenciais de teste*: no painel atual elas também começam com `APP_USR-`, e os pagamentos feitos com elas são recusados no site no ar.
 - **Como o pagamento é confirmado:** o Pulso nunca confia no navegador. Ele consulta o pagamento direto na API do Mercado Pago (valor, moeda, referência do pedido e se é de produção) quando:
   - o cliente volta do checkout;
   - chega o aviso automático (webhook);
@@ -88,6 +88,7 @@ Nenhuma delas exige código: é só copiar as chaves para as variáveis do Railw
   - copie a *assinatura secreta* para `MP_WEBHOOK_SECRET`;
   - depois ligue `MP_WEBHOOK_REQUIRE_SIGNATURE=1`.
 - **Meios aceitos:** Pix e cartão de crédito (à vista). Boleto está desligado porque demora dias para compensar.
+- **Compra de teste:** use uma conta do Pulso com e-mail diferente do da conta do Mercado Pago e pague o Pix pelo app do banco (o Mercado Pago não deixa a conta pagar a si mesma).
 
 ## Stripe (dólar)
 
@@ -97,6 +98,7 @@ Nenhuma delas exige código: é só copiar as chaves para as variáveis do Railw
   - URL: `https://pulso.mgrservicosdigitais.com.br/api/webhooks/stripe`
   - Eventos: `checkout.session.completed`, `checkout.session.async_payment_succeeded`, `checkout.session.async_payment_failed` e `charge.refunded`
   - Copie o *Signing secret* (`whsec_…`) para `STRIPE_WEBHOOK_SECRET`. Avisos sem essa assinatura são recusados.
+- **Modo de teste no site no ar:** com a chave de teste (`rk_test_…`), só os pedidos da conta do dono pagam. Os clientes em inglês e espanhol montam o vídeo e o pedido fica salvo, mas veem "o pagamento abre em breve" (ninguém leva vídeo com o cartão 4242). Isso vale até a chave de produção entrar. `TEST_PAYMENTS=open` libera o teste para todos.
 - **Guarde as chaves "seladas":** no Railway, em *Variables*, use *Seal* em `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `MP_ACCESS_TOKEN`, `ANTHROPIC_API_KEY` e `ADMIN_TOKEN`. O valor continua funcionando, mas some da tela e dos registros. Nunca coloque chaves no código nem em arquivos do repositório.
 - **Como o pagamento é confirmado:** o aviso só dispara a conferência. O Pulso relê a sessão na API do Stripe (versão `2026-08-26.dahlia`, fixada no código) e só libera se ela estiver paga, em dólar, com o valor certo e do mesmo modo (teste ou produção) da chave. Pagamentos que confirmam depois (como débito em conta nos EUA) liberam só quando o Stripe avisa que caíram.
 - **Tipo de checkout:** página de pagamento hospedada pelo Stripe (o cliente vai ao Stripe e volta ao pedido). É o caminho que o planejador do Stripe recomendou para o Pulso: venda de produto digital no navegador, uma cobrança por vídeo, sem assinatura.
@@ -175,6 +177,7 @@ Sem as chaves de pagamento o site funciona e mostra a prévia, mas não cobra. P
 - o vídeo de 30 s: preço, cenas extras, storyboard, fotos guardadas no pedido, duração do MP4 e a trilha em cada parte;
 - a correção grátis e a marca salva;
 - o painel, os reembolsos e os avisos assinados;
+- o modo de teste no site no ar (só o dono paga com cartão de teste; o cliente vê "o pagamento abre em breve");
 - os três idiomas e as proteções de segurança.
 
 Precisa do Playwright instalado globalmente. Os vídeos de exemplo da página inicial são gerados com `LANG_EX=pt|en|es node test/render-examples.mjs`.
