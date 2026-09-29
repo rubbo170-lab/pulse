@@ -296,6 +296,10 @@ api.post('/api/webhooks/stripe', async (req, res) => {
       // relê a sessão direto na API do Stripe antes de liberar
       const o = Orders.applyStripeSession(await ST.getSession(obj.id), 'webhook');
       if (o && o.status === 'paid') nudge();
+    } else if (ev.type === 'checkout.session.async_payment_failed' && obj && obj.id) {
+      // pagamento que confirma depois (ex.: débito em conta nos EUA) e falhou: o pedido continua aguardando pagamento
+      Orders.applyStripeSession(await ST.getSession(obj.id), 'webhook');
+      logEvent('payment.failed', { orderId: obj.client_reference_id || null, detail: `stripe ${obj.id} async_payment_failed` });
     } else if (ev.type === 'charge.refunded' && obj) Orders.applyStripeRefund(obj, 'webhook');
   } catch (e) { console.error('[pulso] webhook Stripe:', ev.type, e.message); }
 });
@@ -329,7 +333,7 @@ api.get('/api/admin/summary', async (req, res) => {
     renderAvgMs: render.avg ? Math.round(render.avg) : null, aiToday: q('SELECT COUNT(*) AS n FROM ai_calls WHERE at > ?').get(since(1)).n,
     freeMB: Math.round(Math.min(Orders.freeBytes(), 1e15) / 1e6),
     alerts: q(`SELECT kind, order_id, detail, at FROM events WHERE kind IN ('payment.duplicate', 'payment.mismatch', 'render.failed', 'webhook.bad_signature', 'disk.low') AND at > ? ORDER BY at DESC LIMIT 20`).all(since(14)),
-    config: { paymentsBRL: paymentsReady('BRL'), paymentsUSD: paymentsReady('USD'), stripeWebhook: !!config.stripe.webhookSecret, aiEnabled: aiReady(), webhookSecret: !!config.mp.webhookSecret, sandbox: config.mp.sandbox, prices: config.prices, appUrl: config.appUrl, fps: config.render.fps },
+    config: { paymentsBRL: paymentsReady('BRL'), paymentsUSD: paymentsReady('USD'), stripeWebhook: !!config.stripe.webhookSecret, stripeTest: ST.isTestKey(), stripeInvoices: config.stripe.invoices, stripeTax: config.stripe.tax, aiEnabled: aiReady(), webhookSecret: !!config.mp.webhookSecret, sandbox: config.mp.sandbox, prices: config.prices, appUrl: config.appUrl, fps: config.render.fps },
   });
 });
 

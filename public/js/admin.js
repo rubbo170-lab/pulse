@@ -30,6 +30,8 @@
       + chip(c.webhookSecret, c.webhookSecret ? 'Aviso do Mercado Pago com assinatura' : 'Sem MP_WEBHOOK_SECRET', c.webhookSecret ? 'ok' : 'warn')
       + chip(c.paymentsUSD, c.paymentsUSD ? 'Dólar: Stripe ligado' : 'Dólar desligado (STRIPE_SECRET_KEY)')
       + (c.paymentsUSD ? chip(c.stripeWebhook, c.stripeWebhook ? 'Aviso do Stripe com assinatura' : 'Falta STRIPE_WEBHOOK_SECRET') : '')
+      + (c.paymentsUSD && c.stripeTest ? chip(false, 'Stripe em modo teste', 'warn') : '')
+      + (c.paymentsUSD ? chip(true, `Stripe: ${c.stripeInvoices ? 'fatura por e-mail' : 'sem fatura'} · ${c.stripeTax ? 'imposto automático' : 'sem imposto automático'}`) : '')
       + chip(c.aiEnabled, c.aiEnabled ? 'IA ligada' : 'IA desligada (ANTHROPIC_API_KEY)')
       + (p.BRL ? `<span class="chip">15 s: ${M(p.BRL[15], 'BRL')} · ${M(p.USD[15], 'USD')}</span><span class="chip">20 s: ${M(p.BRL[20], 'BRL')} · ${M(p.USD[20], 'USD')}</span>` : '')
       + `<span class="chip">${E(c.appUrl)}</span><span class="chip">${c.fps} fps</span>`;

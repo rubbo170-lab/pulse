@@ -80,7 +80,7 @@ export function startMocks({ port = 0, webhookSecret = 'segredo-teste', stripeWe
     let m;
     // ── Stripe API (form-urlencoded, chave sk_test_)
     if (p.startsWith('/v1/checkout/') || p === '/v1/refunds') {
-      if (!/^Bearer sk_test_\w+/.test(req.headers.authorization || '')) return send(res, 401, { error: { type: 'invalid_request_error', message: 'Invalid API Key provided' } });
+      if (!/^Bearer (sk|rk)_test_\w+/.test(req.headers.authorization || '')) return send(res, 401, { error: { type: 'invalid_request_error', message: 'Invalid API Key provided' } });
       if (req.method === 'POST' && p === '/v1/checkout/sessions') {
         if (!/application\/x-www-form-urlencoded/.test(req.headers['content-type'] || '')) return send(res, 400, { error: { message: 'form expected' } });
         const b = unform(await read(req));
@@ -90,7 +90,8 @@ export function startMocks({ port = 0, webhookSecret = 'segredo-teste', stripeWe
         const base = `http://127.0.0.1:${server.address().port}`;
         const sn = { id, object: 'checkout.session', mode: 'payment', status: 'open', payment_status: 'unpaid', livemode: false, currency: li.price_data.currency, amount_total: Number(li.price_data.unit_amount) * Number(li.quantity || 1),
           client_reference_id: b.client_reference_id, metadata: b.metadata || {}, customer_email: b.customer_email, locale: b.locale, success_url: b.success_url, cancel_url: b.cancel_url, expires_at: Number(b.expires_at), url: `${base}/stripe/checkout/${id}`,
-          product_name: li.price_data.product_data && li.price_data.product_data.name, payment_intent: null, idempotency: req.headers['idempotency-key'] || null, stripe_version: req.headers['stripe-version'] || null };
+          product_name: li.price_data.product_data && li.price_data.product_data.name, payment_intent: null, idempotency: req.headers['idempotency-key'] || null, stripe_version: req.headers['stripe-version'] || null,
+          integration_identifier: b.integration_identifier || null, invoice_creation: b.invoice_creation || null, automatic_tax: b.automatic_tax || null, payment_method_types: b.payment_method_types || null };
         sessions.set(id, sn);
         return send(res, 200, sn);
       }

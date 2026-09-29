@@ -94,13 +94,22 @@ Nenhuma delas exige código: é só copiar as chaves para as variáveis do Railw
 
 ## Stripe (dólar)
 
-- **Chaves:** *Developers* → *API keys* → **Secret key** em `STRIPE_SECRET_KEY`. Use primeiro a de teste (`sk_test_…`), depois a de produção (`sk_live_…`).
+- **Conta:** use uma conta do Stripe só do Pulso (o nome dela aparece na tela de pagamento e na fatura do cartão).
+- **Chave (de preferência restrita):** *Developers* → *API keys* → *Create restricted key*, com só estas permissões: **Checkout Sessions: Write**, **Refunds: Write**, **Invoices: Write** e **Customers: Write** (a fatura cria o cliente). Se ligar o imposto, acrescente **Tax Calculations and Transactions: Read**. Cole em `STRIPE_SECRET_KEY`. A chave secreta (`sk_…`) também funciona, mas dá acesso total à conta. Use primeiro a de teste (`rk_test_…`) e o cartão 4242 4242 4242 4242, depois a de produção (`rk_live_…`).
 - **Webhook (obrigatório):** *Developers* → *Webhooks* → *Add endpoint*:
   - URL: `https://pulso.mgrservicosdigitais.com.br/api/webhooks/stripe`
-  - Eventos: `checkout.session.completed`, `checkout.session.async_payment_succeeded` e `charge.refunded`
+  - Eventos: `checkout.session.completed`, `checkout.session.async_payment_succeeded`, `checkout.session.async_payment_failed` e `charge.refunded`
   - Copie o *Signing secret* (`whsec_…`) para `STRIPE_WEBHOOK_SECRET`. Avisos sem essa assinatura são recusados.
-- **Como o pagamento é confirmado:** o aviso só dispara a conferência. O Pulso relê a sessão na API do Stripe e só libera se ela estiver paga, em dólar, com o valor certo e do mesmo modo (teste ou produção) da chave.
-- **Meios:** o checkout do Stripe mostra os meios ligados no seu painel (*Settings* → *Payment methods*): cartão, Apple Pay, Google Pay, Link.
+- **Guarde as chaves "seladas":** no Railway, em *Variables*, use *Seal* em `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `MP_ACCESS_TOKEN`, `ANTHROPIC_API_KEY` e `ADMIN_TOKEN`. O valor continua funcionando, mas some da tela e dos registros. Nunca coloque chaves no código nem em arquivos do repositório.
+- **Como o pagamento é confirmado:** o aviso só dispara a conferência. O Pulso relê a sessão na API do Stripe (versão `2026-08-26.dahlia`, fixada no código) e só libera se ela estiver paga, em dólar, com o valor certo e do mesmo modo (teste ou produção) da chave. Pagamentos que confirmam depois (como débito em conta nos EUA) liberam só quando o Stripe avisa que caíram.
+- **Meios:** o checkout do Stripe mostra os meios ligados no seu painel (*Settings* → *Payment methods*): cartão, Apple Pay, Google Pay, Link. O código não fixa a lista, então o Stripe escolhe os mais relevantes para cada cliente.
+- **Fatura (Invoicing):** depois do pagamento o Stripe gera uma fatura paga em PDF, com o número do pedido e o CNPJ no rodapé, e envia por e-mail ao cliente (ligue *Settings* → *Customer emails* → *Successful payments*). O Stripe cobra uma pequena taxa por fatura; `STRIPE_INVOICES=0` desliga. A fatura do Stripe não substitui a NFS-e: fale com seu contador sobre a nota das vendas para o exterior.
+- **Imposto (Stripe Tax):** vem desligado. Para ligar:
+  1. *Tax* → *Settings*: endereço da empresa e o código de imposto padrão.
+  2. *Tax* → *Registrations*: os lugares onde você é obrigado a cobrar imposto (decida com seu contador; vender serviço digital para consumidores de alguns países exige registro desde a primeira venda).
+  3. No Railway: `STRIPE_TAX=1`, e opcionalmente `STRIPE_TAX_CODE` (um código `txcd_…` escolhido na lista oficial do Stripe) e `STRIPE_TAX_BEHAVIOR` (`inclusive`, o padrão, mantém o preço anunciado com o imposto dentro; `exclusive` soma o imposto ao preço).
+
+  Sem registro ativo, o Stripe não cobra imposto nenhum, mesmo com `STRIPE_TAX=1`. Com o imposto ligado, o checkout também aceita o número fiscal de empresas (VAT), para vendas entre empresas.
 - **Recebimento:** a conta brasileira do Stripe cobra o cliente em dólar e deposita em reais. Segundo o próprio Stripe, cartões emitidos no Brasil só podem ser cobrados em reais. Por isso a versão em inglês e espanhol avisa: quem tem cartão brasileiro paga com Pix na versão em português. Confira no painel do Stripe as taxas e o prazo de repasse para contas no Brasil.
 
 ## IA do roteiro (Anthropic)
