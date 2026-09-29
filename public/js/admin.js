@@ -31,9 +31,10 @@
       + chip(c.paymentsUSD, c.paymentsUSD ? 'Dólar: Stripe ligado' : 'Dólar desligado (STRIPE_SECRET_KEY)')
       + (c.paymentsUSD ? chip(c.stripeWebhook, c.stripeWebhook ? 'Aviso do Stripe com assinatura' : 'Falta STRIPE_WEBHOOK_SECRET') : '')
       + (c.paymentsUSD && c.stripeTest ? chip(false, 'Stripe em modo teste', 'warn') : '')
-      + (c.paymentsUSD ? chip(true, `Stripe: ${c.stripeInvoices ? 'fatura por e-mail' : 'sem fatura'} · ${c.stripeTax ? 'imposto automático' : 'sem imposto automático'}`) : '')
+      + (c.paymentsUSD ? chip(true, `Stripe: ${c.stripeInvoices ? 'fatura por e-mail' : 'sem fatura'} · ${c.stripeTax === 'on' ? 'imposto automático' : 'sem imposto automático'}`) : '')
+      + (c.paymentsUSD && c.stripeTax === 'blocked' ? chip(false, 'Stripe recusou o imposto automático (conta sem Stripe Tax): vendas seguem sem ele; deixe STRIPE_TAX=0', 'warn') : '')
       + chip(c.aiEnabled, c.aiEnabled ? 'IA ligada' : 'IA desligada (ANTHROPIC_API_KEY)')
-      + (p.BRL ? `<span class="chip">15 s: ${M(p.BRL[15], 'BRL')} · ${M(p.USD[15], 'USD')}</span><span class="chip">20 s: ${M(p.BRL[20], 'BRL')} · ${M(p.USD[20], 'USD')}</span>` : '')
+      + (p.BRL ? [15, 20, 30].map((d) => `<span class="chip">${d} s: ${M(p.BRL[d], 'BRL')} · ${M(p.USD[d], 'USD')}</span>`).join('') : '')
       + `<span class="chip">${E(c.appUrl)}</span><span class="chip">${c.fps} fps</span>`;
     $('alerts').innerHTML = (s.alerts || []).map((a) => `<div class="alert"><b>${E(KIND[a.kind] || a.kind)}</b> · ${Site.fmtDate(a.at, true)}${a.order_id ? ` · <button class="link" type="button" data-open="${E(a.order_id)}">pedido ${E(a.order_id)}</button>` : ''}<div class="dim">${E(a.detail || '')}</div></div>`).join('');
   }

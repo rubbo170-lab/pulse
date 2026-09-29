@@ -333,7 +333,7 @@ api.get('/api/admin/summary', async (req, res) => {
     renderAvgMs: render.avg ? Math.round(render.avg) : null, aiToday: q('SELECT COUNT(*) AS n FROM ai_calls WHERE at > ?').get(since(1)).n,
     freeMB: Math.round(Math.min(Orders.freeBytes(), 1e15) / 1e6),
     alerts: q(`SELECT kind, order_id, detail, at FROM events WHERE kind IN ('payment.duplicate', 'payment.mismatch', 'render.failed', 'webhook.bad_signature', 'disk.low') AND at > ? ORDER BY at DESC LIMIT 20`).all(since(14)),
-    config: { paymentsBRL: paymentsReady('BRL'), paymentsUSD: paymentsReady('USD'), stripeWebhook: !!config.stripe.webhookSecret, stripeTest: ST.isTestKey(), stripeInvoices: config.stripe.invoices, stripeTax: config.stripe.tax, aiEnabled: aiReady(), webhookSecret: !!config.mp.webhookSecret, sandbox: config.mp.sandbox, prices: config.prices, appUrl: config.appUrl, fps: config.render.fps },
+    config: { paymentsBRL: paymentsReady('BRL'), paymentsUSD: paymentsReady('USD'), stripeWebhook: !!config.stripe.webhookSecret, stripeTest: ST.isTestKey(), stripeInvoices: config.stripe.invoices, stripeTax: ST.taxStatus(),aiEnabled: aiReady(), webhookSecret: !!config.mp.webhookSecret, sandbox: config.mp.sandbox, prices: config.prices, appUrl: config.appUrl, fps: config.render.fps },
   });
 });
 

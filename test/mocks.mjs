@@ -18,7 +18,8 @@ function unform(text) {
   return out;
 }
 
-export function startMocks({ port = 0, webhookSecret = 'segredo-teste', stripeWebhookSecret = 'whsec_teste', aiReply } = {}) {
+// stripeTaxSupported=false imita a conta do Pulso (Brasil): o Stripe recusa automatic_tax
+export function startMocks({ port = 0, webhookSecret = 'segredo-teste', stripeWebhookSecret = 'whsec_teste', stripeTaxSupported = false, aiReply } = {}) {
   const prefs = new Map(), payments = new Map(), sessions = new Map(), refunds = [];
   let seq = 1000, stripeWebhookUrl = null;
   const log = [];
@@ -86,12 +87,14 @@ export function startMocks({ port = 0, webhookSecret = 'segredo-teste', stripeWe
         const b = unform(await read(req));
         const li = b.line_items && b.line_items[0];
         if (b.mode !== 'payment' || !li || !li.price_data || !(Number(li.price_data.unit_amount) > 0) || !b.success_url || !b.client_reference_id) return send(res, 400, { error: { message: 'invalid session params' } });
+        if (b.automatic_tax && b.automatic_tax.enabled === 'true' && !stripeTaxSupported) { log.push('stripe:tax-refused'); return send(res, 400, { error: { type: 'invalid_request_error', message: 'Stripe Tax is not supported for your account country. See the full list of countries supported in: https://stripe.com/docs/tax/supported-countries' } }); }
         const id = 'cs_test_' + crypto.randomBytes(12).toString('hex');
         const base = `http://127.0.0.1:${server.address().port}`;
         const sn = { id, object: 'checkout.session', mode: 'payment', status: 'open', payment_status: 'unpaid', livemode: false, currency: li.price_data.currency, amount_total: Number(li.price_data.unit_amount) * Number(li.quantity || 1),
           client_reference_id: b.client_reference_id, metadata: b.metadata || {}, customer_email: b.customer_email, locale: b.locale, success_url: b.success_url, cancel_url: b.cancel_url, expires_at: Number(b.expires_at), url: `${base}/stripe/checkout/${id}`,
           product_name: li.price_data.product_data && li.price_data.product_data.name, payment_intent: null, idempotency: req.headers['idempotency-key'] || null, stripe_version: req.headers['stripe-version'] || null,
-          integration_identifier: b.integration_identifier || null, invoice_creation: b.invoice_creation || null, automatic_tax: b.automatic_tax || null, payment_method_types: b.payment_method_types || null };
+          integration_identifier: b.integration_identifier || null, invoice_creation: b.invoice_creation || null, automatic_tax: b.automatic_tax || null, payment_method_types: b.payment_method_types || null,
+          origin_context: b.origin_context || null, branding_settings: b.branding_settings || null, tax_id_collection: b.tax_id_collection || null, tax_behavior: li.price_data.tax_behavior || null, tax_code: (li.price_data.product_data && li.price_data.product_data.tax_code) || null };
         sessions.set(id, sn);
         return send(res, 200, sn);
       }

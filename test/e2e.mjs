@@ -162,6 +162,7 @@ try {
   enOrder = sn.client_reference_id;
   check('EN: sessão do Stripe em dólar com valor de 20 s', sn.amount_total === 1290 && sn.currency === 'usd' && sn.locale === 'en' && /^[a-z0-9]{16}$/.test(enOrder) && sn.success_url === `${BASE}/en/order/${enOrder}?session_id={CHECKOUT_SESSION_ID}` && /20s/.test(sn.product_name) && sn.stripe_version === '2026-08-26.dahlia', `${sn.product_name}`);
   check('EN: checkout com fatura, rótulo da integração e meios de pagamento dinâmicos', sn.invoice_creation && sn.invoice_creation.enabled === 'true' && sn.invoice_creation.invoice_data && sn.invoice_creation.invoice_data.metadata.order_id === enOrder && /^pulso_video_checkout_[a-z]{8}$/.test(sn.integration_identifier || '') && !sn.payment_method_types && !sn.automatic_tax, JSON.stringify(sn.invoice_creation && sn.invoice_creation.invoice_data).slice(0, 120));
+  check('EN: checkout hospedado com o nome e as cores do Pulso, número fiscal opcional', sn.origin_context === 'web' && sn.branding_settings && sn.branding_settings.display_name === 'Pulso' && sn.branding_settings.button_color === '#7C5CFF' && sn.tax_id_collection && sn.tax_id_collection.enabled === 'true', JSON.stringify(sn.branding_settings));
   await ep.click('#stripePay');
   await ep.waitForURL(/\/en\/order\/[a-z0-9]{16}\?session_id=cs_test_/, { timeout: 30000 });
   await ep.waitForFunction(() => /Payment confirmed|Rendering|ready/.test(document.getElementById('oTitle').textContent), null, { timeout: 30000 });
