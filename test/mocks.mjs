@@ -87,7 +87,7 @@ export function startMocks({ port = 0, webhookSecret = 'segredo-teste', stripeWe
         const b = unform(await read(req));
         const li = b.line_items && b.line_items[0];
         if (b.mode !== 'payment' || !li || !li.price_data || !(Number(li.price_data.unit_amount) > 0) || !b.success_url || !b.client_reference_id) return send(res, 400, { error: { message: 'invalid session params' } });
-        if (b.automatic_tax && b.automatic_tax.enabled === 'true' && !stripeTaxSupported) { log.push('stripe:tax-refused'); return send(res, 400, { error: { type: 'invalid_request_error', message: 'Stripe Tax is not supported for your account country. See the full list of countries supported in: https://stripe.com/docs/tax/supported-countries' } }); }
+        if (b.automatic_tax && b.automatic_tax.enabled === 'true' && !stripeTaxSupported) { log.push('stripe:tax-refused'); return send(res, 400, { error: { type: 'invalid_request_error', message_code: 'tax_country_unsupported', message: 'Stripe Tax is not supported for your account country. See the full list of countries supported in: https://stripe.com/docs/tax/supported-countries' } }); }
         const id = 'cs_test_' + crypto.randomBytes(12).toString('hex');
         const base = `http://127.0.0.1:${server.address().port}`;
         const sn = { id, object: 'checkout.session', mode: 'payment', status: 'open', payment_status: 'unpaid', livemode: false, currency: li.price_data.currency, amount_total: Number(li.price_data.unit_amount) * Number(li.quantity || 1),
